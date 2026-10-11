@@ -1,4 +1,4 @@
-Tu travailles sur « Oh purée ! », un jeu mobile de chute infinie. Lis d'abord CLAUDE.md, puis legacy/pas-de-puree-v8.html (la source de vérité du gameplay).
+Tu travailles sur « Oh purée ! », un jeu mobile de chute infinie. Lis d'abord CLAUDE.md, puis legacy/ohpureeV0.html (la source de vérité du gameplay).
 
 Objectif : migrer ce prototype mono-fichier vers un vrai projet Vite + TypeScript (strict), SANS changer le gameplay ni l'équilibrage, puis l'empaqueter avec Capacitor 8 pour Android et préparer iOS. Je développe sous Windows.
 
