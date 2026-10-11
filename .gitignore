@@ -1,0 +1,37 @@
+# Dépendances et builds
+node_modules/
+dist/
+coverage/
+*.log
+*.tsbuildinfo
+
+# Variables d'environnement (seul l'exemple est versionné)
+.env
+.env.*
+!.env.example
+
+# Secrets de signature Android
+*.keystore
+*.jks
+keystore.properties
+signing.properties
+local.properties
+
+# Secrets de signature / publication Apple
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+*.provisionprofile
+
+# Comptes de service / clés diverses
+*.pem
+*.key
+service-account*.json
+
+# Système / éditeurs
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
