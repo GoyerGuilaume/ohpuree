@@ -6,7 +6,77 @@
 <title>Oh purée !</title>
 </head>
 <body>
-<div id="stage"></div>
+<div id="stage">
+  <canvas id="cv"></canvas>
+
+  <div class="overlay" id="menu">
+    <div class="seg langsel" data-key="lang"><button data-v="fr">FR</button><button data-v="en">EN</button><button data-v="es">ES</button><button data-v="de">DE</button></div>
+    <h1>🥔 <span data-i18n="title">Oh purée !</span></h1>
+    <p class="tag" data-i18n="tagline">Plonge dans le vide, esquive les pilons… et méfie-toi des lames.</p>
+    <div class="row"><span data-i18n="lbl_control">Contrôle</span>
+      <div class="seg" data-key="control"><button data-v="tilt" data-i18n="opt_tilt">Inclinaison</button><button data-v="tap" data-i18n="opt_tap">Tactile</button></div></div>
+    <div class="row"><span data-i18n="lbl_mode">Mode</span>
+      <div class="seg" data-key="mode"><button data-v="classic" data-i18n="opt_classic">Classique</button><button data-v="survive" data-i18n="opt_survive">Survie</button></div></div>
+    <div class="row"><span data-i18n="lbl_sound">Son</span>
+      <div class="seg" data-key="sound"><button data-v="on" data-i18n="opt_on">On</button><button data-v="off" data-i18n="opt_off">Off</button></div></div>
+    <p class="hint" id="hint"></p>
+    <div class="btns">
+      <button class="big" id="play" data-i18n="play">Jouer</button>
+      <button class="ghost" id="openAch" data-i18n="ach_btn">🏆 Succès</button>
+      <button class="ghost" id="openShop" data-i18n="shop_btn">🛒 Boutique</button>
+    </div>
+    <p class="best" id="bestLine"></p>
+    <button class="ghost small hidden" id="devBtn">🛠 Mode dev : off</button>
+  </div>
+
+  <div class="overlay hidden" id="over">
+    <h2 data-i18n="over_title">Purée ! 🥣</h2>
+    <p class="score" id="finalScore">0 m</p>
+    <p class="best" id="finalBest"></p>
+    <p class="best" id="finalGold"></p>
+    <p class="best" id="finalAch"></p>
+    <div class="btns">
+      <button class="big" id="again" data-i18n="again">Rejouer</button>
+      <button class="ghost" id="overShop" data-i18n="shop_btn">🛒 Boutique</button>
+      <button class="ghost" id="toMenu" data-i18n="menu_btn">Menu</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="shop">
+    <h2 data-i18n="shop_title">🛒 Boutique</h2>
+    <p class="best" id="walletLine"></p>
+    <div class="tabs" id="shopTabs"><button data-t="items" data-i18n="tab_items">Objets</button><button data-t="skins" data-i18n="tab_skins">Skins</button></div>
+    <button class="ghost small hidden" id="devGold">🛠 +1000 🪙</button>
+    <div class="shop-list" id="shopList"></div>
+    <p class="hint" data-i18n="shop_hint">Les consommables sont utilisés automatiquement au début de chaque partie.</p>
+    <button class="ghost" id="shopBack" data-i18n="back">Retour</button>
+  </div>
+
+  <div class="overlay hidden" id="ach">
+    <h2 data-i18n="ach_title">🏆 Succès</h2>
+    <p class="best" id="achCount"></p>
+    <div class="shop-list" id="achList"></div>
+    <button class="ghost small hidden" id="achReset" data-i18n="ach_reset">🛠 Réinitialiser les succès</button>
+    <button class="ghost" id="achBack" data-i18n="back">Retour</button>
+  </div>
+
+  <div class="overlay hidden" id="pause">
+    <h2 data-i18n="pause_title">Pause</h2>
+    <div class="row"><span data-i18n="lbl_sound">Son</span>
+      <div class="seg" data-key="sound"><button data-v="on" data-i18n="opt_on">On</button><button data-v="off" data-i18n="opt_off">Off</button></div></div>
+    <div class="btns" style="flex-direction:column">
+      <button class="big" id="resumeBtn" data-i18n="resume">▶ Reprendre</button>
+      <button class="ghost" id="restartBtn" data-i18n="restart">🔄 Recommencer</button>
+      <button class="ghost" id="quitBtn" data-i18n="quit">🏠 Menu principal</button>
+    </div>
+    <button class="ghost small hidden" id="hitboxBtn">🛠 Hitbox : off</button>
+  </div>
+
+  <button class="pausebtn hidden" id="pauseBtn" aria-label="Pause"></button>
+
+  <div id="toast"></div>
+</div>
+
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
