@@ -47,6 +47,7 @@ export const de: Dict = {
   premium_label: '⭐ Premium-Skins · passive Fähigkeiten',
   equipped: 'Ausgerüstet ✓',
   equip: 'Ausrüsten',
+  buy_price: 'Kaufen · {0}',
   try_price: 'Testen · {0}',
 
   // Succès (écran)
@@ -63,6 +64,7 @@ export const de: Dict = {
   toast_demo: 'Demo-Modus: Echtkäufe sind noch nicht angebunden.',
   toast_ketchup: '🍅 Ketchup: Klinge abgewehrt!',
   toast_mayo: '🥚 Mayo: Nudelholz abgewehrt!',
+  toast_buy_error: 'Kauf gerade nicht möglich.',
   toast_ach_reset: 'Erfolge zurückgesetzt (Dev-Modus).',
 
   // Tutoriel en jeu

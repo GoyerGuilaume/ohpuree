@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyInventory } from './profile';
-import { buyItem, buySkin, devAddGold, equipSkin, resetAchievements, toggleDev, trySkin } from './shop';
+import { applyPurchase, buyItem, buySkin, devAddGold, equipSkin, resetAchievements, restoreSkins, toggleDev, trySkin } from './shop';
 import { testWorld } from './testkit';
 
 describe('boutique', () => {
@@ -89,5 +89,42 @@ describe('boutique', () => {
     resetAchievements(w);
     expect(w.profile.ach).toEqual({});
     expect(w.profile.stats.runs).toBe(0);
+  });
+});
+
+describe('achats de skins premium', () => {
+  it('mode démo : essai pour la session (comportement du prototype)', () => {
+    const w = testWorld();
+    applyPurchase(w, 'magnet', 'demo');
+    expect(w.profile.skinId).toBe('magnet');
+    expect(w.profile.owned.magnet).toBeUndefined();
+  });
+
+  it('achat réel : possédé, équipé, sauvegardé', () => {
+    const w = testWorld({ profile: { owned: { classic: true, roseval: true } } });
+    applyPurchase(w, 'stone', 'purchased');
+    expect(w.profile.owned.stone).toBe(true);
+    expect(w.profile.skinId).toBe('stone');
+    expect(w.rec.saves).toBeGreaterThan(0);
+    expect(w.profile.ach.garderobe).toBe(true);
+  });
+
+  it('annulé : rien ; erreur : un message', () => {
+    const w = testWorld();
+    applyPurchase(w, 'cape', 'cancelled');
+    expect(w.rec.toasts).toEqual([]);
+    applyPurchase(w, 'cape', 'error');
+    expect(w.rec.toasts).toEqual(['Achat impossible pour le moment.']);
+    expect(w.profile.skinId).toBe('classic');
+  });
+
+  it('restauration : les skins achetés redeviennent possédés, sans changer le skin équipé', () => {
+    const w = testWorld();
+    restoreSkins(w, ['cape', 'magnet']);
+    expect(w.profile.owned).toMatchObject({ cape: true, magnet: true });
+    expect(w.profile.skinId).toBe('classic');
+    const saves = w.rec.saves;
+    restoreSkins(w, ['cape']);
+    expect(w.rec.saves).toBe(saves); // rien de nouveau : pas d'écriture
   });
 });

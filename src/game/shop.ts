@@ -1,7 +1,7 @@
 import { ITEMS } from '../data/items';
 import type { ItemId } from '../data/items';
 import { DEFAULT_SKIN, skinById } from '../data/skins';
-import type { SkinId } from '../data/skins';
+import type { PremiumSkinId, SkinId } from '../data/skins';
 import { tr } from '../i18n';
 import { unlock } from './achievements';
 import { priceOf } from './economy';
@@ -74,4 +74,32 @@ export function resetAchievements(w: World): void {
   w.profile.stats.runs = 0;
   w.fx.save();
   w.fx.toast(tr('toast_ach_reset'));
+}
+
+/** Résultat d'un achat de skin premium via le store. */
+export type PurchaseOutcome = 'purchased' | 'cancelled' | 'demo' | 'error';
+
+/** Applique le résultat d'un achat de skin premium. */
+export function applyPurchase(w: World, id: PremiumSkinId, outcome: PurchaseOutcome): void {
+  if (outcome === 'demo') trySkin(w, id);
+  else if (outcome === 'purchased') grantSkin(w, id);
+  else if (outcome === 'error') w.fx.toast(tr('toast_buy_error'));
+}
+
+/** Skin premium acheté : possédé pour de bon, équipé et sauvegardé. */
+export function grantSkin(w: World, id: PremiumSkinId): void {
+  const p = w.profile;
+  p.owned[id] = true;
+  p.skinId = id;
+  w.fx.save();
+  if (Object.keys(p.owned).length >= 3) unlock(w, 'garderobe');
+}
+
+/** Achats restaurés par le store : on marque les skins comme possédés. */
+export function restoreSkins(w: World, ids: readonly PremiumSkinId[]): void {
+  const p = w.profile;
+  const missing = ids.filter((id) => !p.owned[id]);
+  if (!missing.length) return;
+  for (const id of missing) p.owned[id] = true;
+  w.fx.save();
 }

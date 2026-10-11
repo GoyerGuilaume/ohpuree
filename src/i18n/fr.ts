@@ -46,6 +46,7 @@ export const fr = {
   premium_label: '⭐ Skins premium · compétences passives',
   equipped: 'Équipé ✓',
   equip: 'Équiper',
+  buy_price: 'Acheter · {0}',
   try_price: 'Essayer · {0}',
 
   // Succès (écran)
@@ -62,6 +63,7 @@ export const fr = {
   toast_demo: 'Mode démo : l’achat réel n’est pas encore branché.',
   toast_ketchup: '🍅 Ketchup : lame évitée !',
   toast_mayo: '🥚 Mayo : pilon évité !',
+  toast_buy_error: 'Achat impossible pour le moment.',
   toast_ach_reset: 'Succès réinitialisés (mode dev).',
 
   // Tutoriel en jeu

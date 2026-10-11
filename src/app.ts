@@ -6,18 +6,22 @@ import { backToMenu, frameDt, inGame, pause, quitToMenu, restartRun, resume, sta
 import { parseProfile, serializeProfile } from './game/profile';
 import type { Settings } from './game/profile';
 import { mathRng } from './game/rng';
-import { devAddGold, resetAchievements, toggleDev } from './game/shop';
+import { applyPurchase, devAddGold, resetAchievements, restoreSkins, toggleDev } from './game/shop';
 import type { Fx, GameOverSummary, Phase, World } from './game/types';
 import { createWorld, devOn } from './game/world';
 import { vibrate } from './platform/haptics';
 import { enableTilt, tilt } from './platform/motion';
-import { loadSave, writeSave } from './platform/storage';
+import { exitApp, initLifecycle } from './platform/lifecycle';
+import { purchases } from './platform/purchases';
+import type { StoreProduct } from './platform/purchases';
+import { writeSave } from './platform/storage';
 import { readTheme } from './render/theme';
 import { drawScene } from './render/scene';
 import type { Screen } from './render/scene';
 import { renderAch } from './ui/achievements';
 import { beep, unlockAudio } from './ui/audio';
 import { $, hide, isHidden, show } from './ui/dom';
+import { backAction } from './ui/back';
 import { Input } from './ui/input';
 import { renderShop } from './ui/shop';
 import type { ShopTab } from './ui/shop';
@@ -27,7 +31,7 @@ const ICON_PAUSE = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden=
 const ICON_PLAY = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>';
 
 /** Relie la logique (src/game), le rendu (src/render) et l'interface DOM, comme le prototype. */
-export function startApp(): void {
+export function startApp(savedJson: string | null): void {
   const cv = $<HTMLCanvasElement>('cv');
   const ctx = cv.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D indisponible');
@@ -38,11 +42,11 @@ export function startApp(): void {
     beep: (f, d, type, vol, slide) => { if (w.profile.settings.sound === 'on') beep(f, d, type, vol, slide); },
     vibrate,
     toast,
-    save: () => writeSave(serializeProfile(w.profile)),
+    save: () => { void writeSave(serializeProfile(w.profile)); },
     phaseChanged: onPhase,
     gameOver: onGameOver,
   };
-  const profile = parseProfile(loadSave(), detectLang(navigator.language), DEV_TOOLS);
+  const profile = parseProfile(savedJson, detectLang(navigator.language), DEV_TOOLS);
   // La taille est mesurée avant de créer la partie de fond (comme le prototype : resize puis newGame).
   const r0 = cv.getBoundingClientRect();
   const w: World = createWorld({ profile, view: { W: r0.width, H: r0.height }, rng: mathRng, fx, devTools: DEV_TOOLS });
@@ -156,7 +160,21 @@ export function startApp(): void {
     w.profile.settings.hitbox = w.profile.settings.hitbox === 'on' ? 'off' : 'on';
     renderPause();
   });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(w); });
+
+  /* ---------- Arrière-plan & bouton retour (Android) ---------- */
+  initLifecycle({
+    onPause: () => { pause(w); },
+    onBack: () => {
+      switch (backAction(w.phase, { shop: !isHidden('shop'), ach: !isHidden('ach') })) {
+        case 'pause': pause(w); break;
+        case 'resume': doResume(); break;
+        case 'closeShop': $('shopBack').click(); break;
+        case 'closeAch': $('achBack').click(); break;
+        case 'toMenu': $('toMenu').click(); break;
+        case 'exit': exitApp(); break;
+      }
+    },
+  });
 
   $('play').addEventListener('click', () => {
     unlockAudio();
@@ -193,19 +211,31 @@ export function startApp(): void {
   });
 
   /* ---------- Boutique ---------- */
+  let products: StoreProduct[] = [];
+  const shopDeps = {
+    demo: purchases.demo,
+    price: (skin: StoreProduct['skin']) => products.find((p) => p.skin === skin)?.price,
+    buyPremium: async (skin: StoreProduct['skin']) => {
+      applyPurchase(w, skin, await purchases.purchase(skin).catch(() => 'error' as const));
+      if (!isHidden('shop')) renderShop(w, shopTab, shopDeps);
+    },
+  };
   function showShop(from: 'menu' | 'over'): void {
     shopFrom = from;
     hide('menu', 'over');
-    renderShop(w, shopTab);
+    renderShop(w, shopTab, shopDeps);
     show('shop');
   }
+  // Prix du store et achats déjà faits (réinstallation) : chargés en arrière-plan.
+  void purchases.products().then((p) => { products = p; }).catch(() => {});
+  void purchases.restore().then((ids) => { restoreSkins(w, ids); syncUI(); }).catch(() => {});
   document.querySelectorAll<HTMLButtonElement>('#shopTabs button').forEach((b) => {
-    b.addEventListener('click', () => { shopTab = b.getAttribute('data-t') as ShopTab; renderShop(w, shopTab); });
+    b.addEventListener('click', () => { shopTab = b.getAttribute('data-t') as ShopTab; renderShop(w, shopTab, shopDeps); });
   });
   $('openShop').addEventListener('click', () => showShop('menu'));
   $('overShop').addEventListener('click', () => showShop('over'));
   $('shopBack').addEventListener('click', () => { hide('shop'); show(shopFrom === 'over' ? 'over' : 'menu'); syncUI(); });
-  $('devGold').addEventListener('click', () => { devAddGold(w); renderShop(w, shopTab); });
+  $('devGold').addEventListener('click', () => { devAddGold(w); renderShop(w, shopTab, shopDeps); });
   $('devBtn').addEventListener('click', () => { toggleDev(w); syncUI(); });
 
   /* ---------- Succès ---------- */

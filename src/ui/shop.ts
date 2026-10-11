@@ -1,14 +1,24 @@
 import { ITEMS, itemDescKey, itemNameKey } from '../data/items';
 import { SKINS, skinDescKey, skinNameKey } from '../data/skins';
+import type { PremiumSkinId } from '../data/skins';
 import { tr } from '../i18n';
 import { priceOf } from '../game/economy';
-import { buyItem, buySkin, equipSkin, trySkin } from '../game/shop';
+import { buyItem, buySkin, equipSkin } from '../game/shop';
 import type { World } from '../game/types';
 import { devOn, isOwned } from '../game/world';
 import { drawSkinPreview } from '../render/potato';
 import { $ } from './dom';
 
 export type ShopTab = 'items' | 'skins';
+
+/** Ce que la boutique doit savoir des achats intégrés. */
+export interface ShopDeps {
+  /** Achat réel non branché : le bouton propose un essai, comme dans le prototype. */
+  demo: boolean;
+  /** Prix localisé du store, s'il est connu. */
+  price(skin: PremiumSkinId): string | undefined;
+  buyPremium(skin: PremiumSkinId): Promise<void>;
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -28,7 +38,7 @@ function row(title: string, sub: string, btn: HTMLButtonElement, lead?: HTMLElem
   return r;
 }
 
-export function renderShop(w: World, tab: ShopTab): void {
+export function renderShop(w: World, tab: ShopTab, deps: ShopDeps): void {
   const p = w.profile;
   $('walletLine').textContent = tr('wallet', p.wallet) + (devOn(w) ? tr('dev_suffix') : '');
   $('devGold').classList.toggle('hidden', !devOn(w));
@@ -37,7 +47,7 @@ export function renderShop(w: World, tab: ShopTab): void {
   });
   const list = $('shopList');
   list.innerHTML = '';
-  const rerender = (): void => renderShop(w, tab);
+  const rerender = (): void => renderShop(w, tab, deps);
 
   if (tab === 'skins') {
     let premiumLabel = false;
@@ -58,8 +68,11 @@ export function renderShop(w: World, tab: ShopTab): void {
         btn.textContent = tr('equip');
         btn.addEventListener('click', () => { equipSkin(w, sk.id); rerender(); });
       } else if (sk.premium) {
-        btn.textContent = tr('try_price', sk.priceEur);
-        btn.addEventListener('click', () => { trySkin(w, sk.id); rerender(); });
+        btn.textContent = tr(deps.demo ? 'try_price' : 'buy_price', deps.price(sk.id) ?? sk.priceEur);
+        btn.addEventListener('click', () => {
+          btn.disabled = true;
+          void deps.buyPremium(sk.id);
+        });
       } else {
         const pr = priceOf(sk.price, p.inv);
         btn.textContent = `${pr} 🪙`;

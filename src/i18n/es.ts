@@ -47,6 +47,7 @@ export const es: Dict = {
   premium_label: '⭐ Skins premium · habilidades pasivas',
   equipped: 'Equipado ✓',
   equip: 'Equipar',
+  buy_price: 'Comprar · {0}',
   try_price: 'Probar · {0}',
 
   // Succès (écran)
@@ -63,6 +64,7 @@ export const es: Dict = {
   toast_demo: 'Modo demo: la compra real aún no está conectada.',
   toast_ketchup: '🍅 Ketchup: ¡cuchilla esquivada!',
   toast_mayo: '🥚 Mayo: ¡rodillo esquivado!',
+  toast_buy_error: 'Compra no disponible por ahora.',
   toast_ach_reset: 'Logros reiniciados (modo dev).',
 
   // Tutoriel en jeu

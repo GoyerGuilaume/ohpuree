@@ -47,6 +47,7 @@ export const en: Dict = {
   premium_label: '⭐ Premium skins · passive abilities',
   equipped: 'Equipped ✓',
   equip: 'Equip',
+  buy_price: 'Buy · {0}',
   try_price: 'Try · {0}',
 
   // Succès (écran)
@@ -63,6 +64,7 @@ export const en: Dict = {
   toast_demo: 'Demo mode: real purchases are not connected yet.',
   toast_ketchup: '🍅 Ketchup: blade dodged!',
   toast_mayo: '🥚 Mayo: rolling pin dodged!',
+  toast_buy_error: 'Purchase unavailable right now.',
   toast_ach_reset: 'Achievements reset (dev mode).',
 
   // Tutoriel en jeu
