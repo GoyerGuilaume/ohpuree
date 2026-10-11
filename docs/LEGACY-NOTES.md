@@ -44,3 +44,12 @@ Règle : aucun changement de gameplay ni d'équilibrage. Les particularités ci-
   dans le prototype : c'est ce qui permet la comparaison au bit près.
 - Une sauvegarde dont un réglage a une valeur inconnue (ex. `mode: "turbo"`) garde la valeur
   par défaut, au lieu de la recopier telle quelle.
+- Rendu (`src/render/`) : porté fonction par fonction. Non repris : la fonction `teeth()`,
+  jamais appelée dans le prototype ; `parseCol` ne lit plus que les couleurs `#rrggbb`
+  (seul format utilisé par les décors).
+- Vérification du rendu (faite à l'étape 4, hors dépôt car elle demande Chromium) : les deux
+  versions sont pilotées dans un navigateur headless avec la même graine, sans boucle
+  d'animation, puis une frame est dessinée au même état. 50 captures sur 50 identiques au
+  pixel près : 13 décors, fondus entre décors, coupes, hitbox du mode dev. Les écrans DOM
+  (boutique, succès, pause, fin de partie) sont aussi identiques au pixel près.
+
