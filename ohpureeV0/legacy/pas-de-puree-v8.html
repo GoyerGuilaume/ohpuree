@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pas de purée !</title>
+<style>
+:root{
+  --lane-a:#fff1d6; --lane-b:#ffe6bd; --line:#e2c58f; --ink:#3b2a1a; --muted:#7b6446; --panel:#fffaf0;
+  --accent:#e8892b; --accent-ink:#ffffff;
+  --pin:#8a5a34; --metal:#c9d2da; --metal-dark:#7f8c97; --danger:#d1432f;
+  --potato:#c8924b; --potato-edge:#8c5f2b; --flesh:#f6e3a4; --fry:#f2c94c;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --lane-a:#2b1e15; --lane-b:#34241a; --line:#4a3524; --ink:#ffe9c7; --muted:#c3a47a; --panel:#3a2819;
+  }
+}
+:root[data-theme="dark"]{
+  --lane-a:#2b1e15; --lane-b:#34241a; --line:#4a3524; --ink:#ffe9c7; --muted:#c3a47a; --panel:#3a2819;
+}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0;height:100%;overflow:hidden;background:var(--lane-a);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+  overscroll-behavior:none;
+}
+#stage{position:relative;width:100%;height:100%}
+canvas{display:block;width:100%;height:100%}
+.overlay{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:11px;padding:18px;text-align:center;
+  background:var(--lane-a);
+  background:color-mix(in srgb,var(--lane-a) 92%,transparent);
+}
+.hidden{display:none}
+h1{margin:0;font-size:2.1rem;line-height:1.1}
+h2{margin:0;font-size:2rem}
+.tag{margin:0;color:var(--muted);max-width:30ch}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;width:min(340px,100%)}
+.row>span{font-weight:600}
+.seg,.tabs{display:flex;border:2px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+.seg button,.tabs button{
+  appearance:none;border:0;background:transparent;color:var(--ink);font:inherit;font-size:.95rem;
+  padding:9px 12px;cursor:pointer;
+}
+.seg button.on,.tabs button.on{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.hint{margin:0;color:var(--muted);font-size:.88rem;max-width:34ch;min-height:2.6em}
+.big{
+  appearance:none;border:0;background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:800;
+  font-size:1.35rem;padding:14px 40px;border-radius:16px;cursor:pointer;box-shadow:0 5px 0 rgba(0,0,0,.18);
+}
+.big:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.18)}
+.ghost{
+  appearance:none;border:2px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;font-weight:600;
+  padding:10px 20px;border-radius:14px;cursor:pointer;
+}
+.ghost:disabled{opacity:.45;cursor:default}
+.ghost.small{padding:6px 12px;font-size:.8rem;border-radius:10px}
+.ghost.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.best{margin:0;color:var(--muted);font-size:.9rem}
+.score{font-size:3.2rem;font-weight:800;margin:0}
+.btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
+.shop-list{
+  display:flex;flex-direction:column;gap:8px;width:min(400px,100%);max-height:54vh;overflow-y:auto;
+  touch-action:pan-y;
+}
+.item{
+  display:flex;align-items:center;gap:10px;background:var(--panel);border:2px solid var(--line);
+  border-radius:14px;padding:10px 12px;text-align:left;
+}
+.item .t{flex:1}
+.item small{display:block;color:var(--muted);font-size:.8rem;margin-top:2px}
+.item .ghost{padding:8px 12px;white-space:nowrap}
+.pausebtn{position:absolute;top:8px;right:8px;z-index:10;width:42px;height:42px;display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);cursor:pointer;padding:0;opacity:.92}
+.pausebtn.hidden{display:none}
+.langsel{position:absolute;top:8px;right:8px}
+.langsel button{padding:5px 8px;font-size:.78rem}
+.item.done{border-color:var(--accent)}
+.item.locked{opacity:.65}
+.item .rw{font-weight:700;white-space:nowrap;font-size:.9rem}
+#toast{
+  position:absolute;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;
+  background:var(--ink);color:var(--lane-a);padding:10px 16px;border-radius:12px;font-size:.9rem;max-width:86%;
+  text-align:center;transition:opacity .25s,transform .25s;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv"></canvas>
+
+  <div class="overlay" id="menu">
+    <div class="seg langsel" data-key="lang"><button data-v="fr">FR</button><button data-v="en">EN</button><button data-v="es">ES</button><button data-v="de">DE</button></div>
+    <h1>🥔 <span data-i18n="title">Pas de purée !</span></h1>
+    <p class="tag" data-i18n="tagline">Plonge dans le vide, esquive les pilons… et méfie-toi des lames.</p>
+    <div class="row"><span data-i18n="lbl_control">Contrôle</span>
+      <div class="seg" data-key="control"><button data-v="tilt" data-i18n="opt_tilt">Inclinaison</button><button data-v="tap" data-i18n="opt_tap">Tactile</button></div></div>
+    <div class="row"><span data-i18n="lbl_mode">Mode</span>
+      <div class="seg" data-key="mode"><button data-v="classic" data-i18n="opt_classic">Classique</button><button data-v="survive" data-i18n="opt_survive">Survie</button></div></div>
+    <div class="row"><span data-i18n="lbl_sound">Son</span>
+      <div class="seg" data-key="sound"><button data-v="on" data-i18n="opt_on">On</button><button data-v="off" data-i18n="opt_off">Off</button></div></div>
+    <p class="hint" id="hint"></p>
+    <div class="btns">
+      <button class="big" id="play" data-i18n="play">Jouer</button>
+      <button class="ghost" id="openAch" data-i18n="ach_btn">🏆 Succès</button>
+      <button class="ghost" id="openShop" data-i18n="shop_btn">🛒 Boutique</button>
+    </div>
+    <p class="best" id="bestLine"></p>
+    <button class="ghost small" id="devBtn">🛠 Mode dev : off</button>
+  </div>
+
+  <div class="overlay hidden" id="over">
+    <h2 data-i18n="over_title">Purée ! 🥣</h2>
+    <p class="score" id="finalScore">0 m</p>
+    <p class="best" id="finalBest"></p>
+    <p class="best" id="finalGold"></p>
+    <p class="best" id="finalAch"></p>
+    <div class="btns">
+      <button class="big" id="again" data-i18n="again">Rejouer</button>
+      <button class="ghost" id="overShop" data-i18n="shop_btn">🛒 Boutique</button>
+      <button class="ghost" id="toMenu" data-i18n="menu_btn">Menu</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="shop">
+    <h2 data-i18n="shop_title">🛒 Boutique</h2>
+    <p class="best" id="walletLine"></p>
+    <div class="tabs" id="shopTabs"><button data-t="items" data-i18n="tab_items">Objets</button><button data-t="skins" data-i18n="tab_skins">Skins</button></div>
+    <button class="ghost small hidden" id="devGold">🛠 +1000 🪙</button>
+    <div class="shop-list" id="shopList"></div>
+    <p class="hint" data-i18n="shop_hint">Les consommables sont utilisés automatiquement au début de chaque partie.</p>
+    <button class="ghost" id="shopBack" data-i18n="back">Retour</button>
+  </div>
+
+  <div class="overlay hidden" id="ach">
+    <h2 data-i18n="ach_title">🏆 Succès</h2>
+    <p class="best" id="achCount"></p>
+    <div class="shop-list" id="achList"></div>
+    <button class="ghost small hidden" id="achReset" data-i18n="ach_reset">🛠 Réinitialiser les succès</button>
+    <button class="ghost" id="achBack" data-i18n="back">Retour</button>
+  </div>
+
+  <div class="overlay hidden" id="pause">
+    <h2 data-i18n="pause_title">Pause</h2>
+    <div class="row"><span data-i18n="lbl_sound">Son</span>
+      <div class="seg" data-key="sound"><button data-v="on" data-i18n="opt_on">On</button><button data-v="off" data-i18n="opt_off">Off</button></div></div>
+    <div class="btns" style="flex-direction:column">
+      <button class="big" id="resumeBtn" data-i18n="resume">▶ Reprendre</button>
+      <button class="ghost" id="restartBtn" data-i18n="restart">🔄 Recommencer</button>
+      <button class="ghost" id="quitBtn" data-i18n="quit">🏠 Menu principal</button>
+    </div>
+    <button class="ghost small hidden" id="hitboxBtn">🛠 Hitbox : off</button>
+  </div>
+
+  <button class="pausebtn hidden" id="pauseBtn" aria-label="Pause"></button>
+
+  <div id="toast"></div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  var cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+  var $=function(id){return document.getElementById(id)};
+  var clamp=function(v,a,b){return Math.max(a,Math.min(b,v))};
+  var EMOJI_FONT='"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif';
+  var SANS='system-ui,-apple-system,"Segoe UI",sans-serif';
+
+  /* ---------- Internationalisation (fr, en, es, de) ---------- */
+  var LANGS=['fr','en','es','de'], LI=0;
+  var STR={
+    title:['Pas de purée !','Don’t Get Mashed!','¡Puré no!','Bloß kein Püree!'],
+    tagline:['Plonge dans le vide, esquive les pilons… et méfie-toi des lames.','Dive into the void, dodge the rolling pins… and beware of the blades.','Lánzate al vacío, esquiva los rodillos… y cuidado con las cuchillas.','Stürz dich ins Leere, weich den Nudelhölzern aus … und nimm dich vor den Klingen in Acht.'],
+    lbl_control:['Contrôle','Controls','Control','Steuerung'],
+    opt_tilt:['Inclinaison','Tilt','Inclinación','Neigung'],
+    opt_tap:['Tactile','Touch','Táctil','Touch'],
+    lbl_mode:['Mode','Mode','Modo','Modus'],
+    opt_classic:['Classique','Classic','Clásico','Klassisch'],
+    opt_survive:['Survie','Survival','Supervivencia','Überleben'],
+    lbl_sound:['Son','Sound','Sonido','Ton'],
+    opt_on:['On','On','Sí','An'],
+    opt_off:['Off','Off','No','Aus'],
+    play:['Jouer','Play','Jugar','Spielen'],
+    shop_btn:['🛒 Boutique','🛒 Shop','🛒 Tienda','🛒 Shop'],
+    ach_btn:['🏆 Succès','🏆 Achievements','🏆 Logros','🏆 Erfolge'],
+    over_title:['Purée ! 🥣','Mashed! 🥣','¡Hecho puré! 🥣','Püree! 🥣'],
+    again:['Rejouer','Play again','Jugar de nuevo','Nochmal'],
+    menu_btn:['Menu','Menu','Menú','Menü'],
+    shop_title:['🛒 Boutique','🛒 Shop','🛒 Tienda','🛒 Shop'],
+    tab_items:['Objets','Items','Objetos','Items'],
+    tab_skins:['Skins','Skins','Skins','Skins'],
+    shop_hint:['Les consommables sont utilisés automatiquement au début de chaque partie.','Consumables are used automatically at the start of each run.','Los consumibles se usan automáticamente al empezar cada partida.','Verbrauchsgüter werden zu Beginn jeder Runde automatisch eingesetzt.'],
+    back:['Retour','Back','Volver','Zurück'],
+    ach_title:['🏆 Succès','🏆 Achievements','🏆 Logros','🏆 Erfolge'],
+    ach_reset:['🛠 Réinitialiser les succès','🛠 Reset achievements','🛠 Reiniciar logros','🛠 Erfolge zurücksetzen'],
+    hint_tilt:['Incline ton téléphone à gauche / droite.','Tilt your phone left / right.','Inclina el teléfono a izquierda / derecha.','Neige dein Handy nach links / rechts.'],
+    hint_tap:['Touche la moitié gauche ou droite de l’écran (parfait au lit).','Touch the left or right half of the screen (perfect in bed).','Toca la mitad izquierda o derecha de la pantalla (perfecto en la cama).','Tippe auf die linke oder rechte Bildschirmhälfte (perfekt im Bett).'],
+    hint_classic:['Classique : un morceau écrasé = purée, fin de partie.','Classic: one crushed piece = mash, game over.','Clásico: un trozo aplastado = puré, fin de la partida.','Klassisch: ein zerquetschtes Stück = Püree, Spiel vorbei.'],
+    hint_survive:['Survie : un morceau écrasé ? Les autres continuent… mais la chute s’accélère.','Survival: a piece got crushed? The others keep going… but the fall speeds up.','Supervivencia: ¿un trozo aplastado? Los demás siguen… pero la caída se acelera.','Überleben: Ein Stück zerquetscht? Die anderen machen weiter … aber der Fall wird schneller.'],
+    record:['Record : {0} m','Best: {0} m','Récord: {0} m','Rekord: {0} m'],
+    new_record:['🏆 Nouveau record !','🏆 New record!','🏆 ¡Nuevo récord!','🏆 Neuer Rekord!'],
+    total:['+{0} 🪙  (total : {1} 🪙)','+{0} 🪙  (total: {1} 🪙)','+{0} 🪙  (total: {1} 🪙)','+{0} 🪙  (gesamt: {1} 🪙)'],
+    dev_btn:['🛠 Mode dev : {0}','🛠 Dev mode: {0}','🛠 Modo dev: {0}','🛠 Dev-Modus: {0}'],
+    toast_dev_on:['Mode dev activé : boutique gratuite, tous les skins débloqués.','Dev mode on: free shop, all skins unlocked.','Modo dev activado: tienda gratis, todos los skins desbloqueados.','Dev-Modus an: Shop kostenlos, alle Skins freigeschaltet.'],
+    toast_dev_off:['Mode dev désactivé.','Dev mode off.','Modo dev desactivado.','Dev-Modus aus.'],
+    toast_sensor:['Capteur d’inclinaison indisponible : contrôle tactile activé.','Tilt sensor unavailable: touch controls enabled.','Sensor de inclinación no disponible: control táctil activado.','Neigungssensor nicht verfügbar: Touch-Steuerung aktiviert.'],
+    toast_tilt_denied:['Inclinaison refusée ou indisponible : contrôle tactile activé.','Tilt denied or unavailable: touch controls enabled.','Inclinación denegada o no disponible: control táctil activado.','Neigung abgelehnt oder nicht verfügbar: Touch-Steuerung aktiviert.'],
+    toast_demo:['Mode démo : l’achat réel n’est pas encore branché.','Demo mode: real purchases are not connected yet.','Modo demo: la compra real aún no está conectada.','Demo-Modus: Echtkäufe sind noch nicht angebunden.'],
+    toast_ketchup:['🍅 Ketchup : lame évitée !','🍅 Ketchup: blade dodged!','🍅 Ketchup: ¡cuchilla esquivada!','🍅 Ketchup: Klinge abgewehrt!'],
+    toast_mayo:['🥚 Mayo : pilon évité !','🥚 Mayo: rolling pin dodged!','🥚 Mayo: ¡rodillo esquivado!','🥚 Mayo: Nudelholz abgewehrt!'],
+    toast_ach_reset:['Succès réinitialisés (mode dev).','Achievements reset (dev mode).','Logros reiniciados (modo dev).','Erfolge zurückgesetzt (Dev-Modus).'],
+    ach_count:['{0} / {1} débloqués','{0} / {1} unlocked','{0} / {1} desbloqueados','{0} / {1} freigeschaltet'],
+    ach_secret:['Succès secret : à toi de le trouver.','Secret achievement: find it yourself.','Logro secreto: descúbrelo tú.','Geheimer Erfolg: finde ihn selbst heraus.'],
+    wallet:['Tu as {0} 🪙','You have {0} 🪙','Tienes {0} 🪙','Du hast {0} 🪙'],
+    dev_suffix:['  ·  🛠 mode dev','  ·  🛠 dev mode','  ·  🛠 modo dev','  ·  🛠 Dev-Modus'],
+    kind_cons:['Consommable · ','Consumable · ','Consumible · ','Verbrauchsgut · '],
+    kind_pass:['Passif · ','Passive · ','Pasivo · ','Passiv · '],
+    owned:['Acheté ✓','Owned ✓','Comprado ✓','Gekauft ✓'],
+    get_dev:['Obtenir (dev)','Get (dev)','Obtener (dev)','Holen (dev)'],
+    plus5:['+5 (dev)','+5 (dev)','+5 (dev)','+5 (dev)'],
+    skin_cosmetic:['Cosmétique uniquement.','Cosmetic only.','Solo cosmético.','Nur kosmetisch.'],
+    premium_label:['⭐ Skins premium · compétences passives','⭐ Premium skins · passive abilities','⭐ Skins premium · habilidades pasivas','⭐ Premium-Skins · passive Fähigkeiten'],
+    equipped:['Équipé ✓','Equipped ✓','Equipado ✓','Ausgerüstet ✓'],
+    equip:['Équiper','Equip','Equipar','Ausrüsten'],
+    try_price:['Essayer · {0}','Try · {0}','Probar · {0}','Testen · {0}'],
+    tut_tilt:['Incline le téléphone ↔','Tilt your phone ↔','Inclina el teléfono ↔','Neige dein Handy ↔'],
+    tut_tap:['Touche à gauche / à droite  (ou ← →)','Touch left / right  (or ← →)','Toca izquierda / derecha  (o ← →)','Links / rechts tippen  (oder ← →)'],
+    tut_cape_tilt:['Tape ou glisse vers le haut : planer 🪂','Tap or swipe up: glide 🪂','Toca o desliza hacia arriba: planear 🪂','Tippen oder nach oben wischen: gleiten 🪂'],
+    tut_cape_tap:['Glisse vers le haut (ou ↑) : planer 🪂','Swipe up (or ↑): glide 🪂','Desliza hacia arriba (o ↑): planear 🪂','Nach oben wischen (oder ↑): gleiten 🪂'],
+    tut_stone:['Caillou : une coupe est définitive !','Pebble: a cut is permanent!','Piedra: ¡un corte es definitivo!','Stein: Ein Schnitt ist endgültig!'],
+    b_butter_stone:['🧈 Un caillou ne fond pas… +10 golds','🧈 A pebble doesn’t melt… +10 gold','🧈 Una piedra no se derrite… +10 de oro','🧈 Ein Stein schmilzt nicht … +10 Gold'],
+    b_butter_whole:['🧈 Déjà entier… +6 golds','🧈 Already whole… +6 gold','🧈 Ya estás entero… +6 de oro','🧈 Schon ganz … +6 Gold'],
+    b_butter_ok:['🧈 Tout le monde fusionne !','🧈 Everyone merges!','🧈 ¡Todos se fusionan!','🧈 Alle verschmelzen!'],
+    b_purse:['+8 golds !','+8 gold!','+8 de oro!','+8 Gold!'],
+    b_gold:['+{0} golds !','+{0} gold!','+{0} de oro!','+{0} Gold!'],
+    b_oven_note:['(tu traverses les pilons {0} s)','(you pass through rolling pins for {0} s)','(atraviesas los rodillos {0} s)','(du gehst {0} s lang durch Nudelhölzer)'],
+    b_feather_note:['(chute ralentie)','(slower fall)','(caída más lenta)','(langsamerer Fall)'],
+    b_star_note:['(invincible {0} s)','(invincible for {0} s)','(invencible {0} s)','(unverwundbar {0} s)'],
+    b_loan:[' ! Valable jusqu’à la fin de la partie.','! Valid until the end of the run.','! Válido hasta el final de la partida.','! Gilt bis zum Ende der Runde.'],
+    b_loan_cape:['(↑ ou glisser : planer)','(↑ or swipe: glide)','(↑ o deslizar: planear)','(↑ oder wischen: gleiten)'],
+    b_mustard_note:['(cuisson +4 s)','(baking +4 s)','(cocción +4 s)','(Garzeit +4 s)'],
+    pause_title:['Pause','Paused','Pausa','Pause'],
+    resume:['▶ Reprendre','▶ Resume','▶ Reanudar','▶ Weiter'],
+    restart:['🔄 Recommencer','🔄 Restart','🔄 Reiniciar','🔄 Neustart'],
+    quit:['🏠 Menu principal','🏠 Main menu','🏠 Menú principal','🏠 Hauptmenü'],
+    hitbox_btn:['🛠 Hitbox : {0}','🛠 Hitbox: {0}','🛠 Hitbox: {0}','🛠 Hitbox: {0}']
+  };
+  function tr(k){
+    var a=STR[k]; if(!a) return k;
+    var out=a[LI];
+    for(var i=1;i<arguments.length;i++) out=out.replace('{'+(i-1)+'}',arguments[i]);
+    return out;
+  }
+  function X(a){ return Array.isArray(a)?a[LI]:a; }
+  function detectLang(){ var n=((navigator.language||'fr')+'').slice(0,2).toLowerCase(); return LANGS.indexOf(n)>=0?n:'en'; }
+  function setLang(l){ LI=Math.max(0,LANGS.indexOf(l)); try{ document.documentElement.lang=LANGS[LI]; document.title=tr('title'); }catch(e){} }
+  function applyI18n(){
+    setLang(settings.lang);
+    document.querySelectorAll('[data-i18n]').forEach(function(e){ e.textContent=tr(e.getAttribute('data-i18n')); });
+    syncUI();
+  }
+
+  /* ---------- Boutique : objets ---------- */
+  var ITEMS=[
+    {id:'ketchup',kind:'cons',icon:'🍅',price:12,name:['Ketchup','Ketchup','Kétchup','Ketchup'],
+     desc:['Annule une lame (cumulable).','Cancels one blade (stackable).','Anula una cuchilla (acumulable).','Wehrt eine Klinge ab (stapelbar).']},
+    {id:'mayo',kind:'cons',icon:'🥚',price:15,name:['Mayonnaise','Mayonnaise','Mayonesa','Mayonnaise'],
+     desc:['Annule un pilon (cumulable).','Cancels one rolling pin (stackable).','Anula un rodillo (acumulable).','Wehrt ein Nudelholz ab (stapelbar).']},
+    {id:'mustard',kind:'cons',icon:'🌭',price:20,name:['Moutarde','Mustard','Mostaza','Senf'],
+     desc:['Cuisson +4 s : après une coupe, tes morceaux traversent les pilons plus longtemps (s’ajoute au Four).','Baking +4 s: after a cut, your pieces pass through rolling pins for longer (adds to the Oven).','Cocción +4 s: tras un corte, tus trozos atraviesan los rodillos más tiempo (se suma al Horno).','Garzeit +4 s: Nach einem Schnitt gehen deine Stücke länger durch Nudelhölzer (addiert sich zum Ofen).']},
+    {id:'hot',kind:'cons',icon:'🌶️',price:25,name:['Sauce piquante','Hot sauce','Salsa picante','Scharfe Soße'],
+     desc:['Risque et profit : la chute est 20 % plus rapide, mais les golds comptent ×3.','High risk, high reward: the fall is 20% faster, but gold counts ×3.','Alto riesgo, alta recompensa: la caída es un 20 % más rápida, pero el oro cuenta ×3.','Hohes Risiko, hohe Belohnung: Der Fall ist 20 % schneller, aber Gold zählt ×3.']},
+    {id:'pepper',kind:'cons',icon:'🧂',price:35,name:['Sauce poivre','Pepper sauce','Salsa de pimienta','Pfeffersoße'],
+     desc:['Les golds ramassés comptent double pendant toute la partie.','Gold you collect counts double for the whole run.','El oro que recoges cuenta doble durante toda la partida.','Eingesammeltes Gold zählt die ganze Runde doppelt.']},
+    {id:'ladle',kind:'pass',icon:'🥄',price:120,name:['Louche','Ladle','Cazo','Schöpfkelle'],
+     desc:['Ramasse les golds et le beurre de plus loin.','Picks up gold and butter from further away.','Recoge oro y mantequilla desde más lejos.','Sammelt Gold und Butter aus größerer Entfernung.']},
+    {id:'timer',kind:'pass',icon:'⏲️',price:140,name:['Minuteur','Timer','Temporizador','Küchentimer'],
+     desc:['Les bonus chronométrés (cuisson, étoile, aimant, plume, poivre) durent 25 % plus longtemps.','Timed bonuses (baking, star, magnet, feather, pepper) last 25% longer.','Los bonus temporizados (cocción, estrella, imán, pluma, pimienta) duran un 25 % más.','Zeitlich begrenzte Boni (Garzeit, Stern, Magnet, Feder, Pfeffer) halten 25 % länger.']},
+    {id:'peeler',kind:'pass',icon:'🏷️',price:150,name:['Économe','Thrifty Peeler','Pelapatatas ahorrador','Sparschäler'],
+     desc:['Ristourne de 15 % sur tous les achats en golds de la boutique. (Ça épluche… et ça économise.)','15% off everything you buy with gold in the shop. (It peels… and it saves.)','15 % de descuento en todo lo que compras con oro en la tienda. (Pela… y ahorra.)','15 % Rabatt auf alle Goldkäufe im Shop. (Schält … und spart.)']},
+    {id:'oven',kind:'pass',icon:'♨️',price:200,name:['Four','Oven','Horno','Ofen'],
+     desc:['Après une coupe, tes morceaux sont cuits : ils traversent les pilons pendant 5 s.','After a cut, your pieces are baked: they pass through rolling pins for 5 s.','Tras un corte, tus trozos se hornean: atraviesan los rodillos durante 5 s.','Nach einem Schnitt sind deine Stücke gebacken: Sie gehen 5 s lang durch Nudelhölzer.']}
+  ];
+
+  /* ---------- Skins ---------- */
+  var SKINS=[
+    {id:'classic',name:['Patate classique','Classic potato','Patata clásica','Klassische Kartoffel'],price:0,body:'#c8924b',edge:'#8c5f2b',flesh:'#f6e3a4',fry:'#f2c94c'},
+    {id:'roseval',name:['Roseval','Roseval','Roseval','Roseval'],price:30,body:'#d9707a',edge:'#8f3a46',flesh:'#fbe3d6',fry:'#f7c9b8'},
+    {id:'grenaille',name:['Grenaille','Baby potato','Patata nueva','Drillinge'],price:40,body:'#e6c45a',edge:'#a8862a',flesh:'#fff1b8',fry:'#ffe58a'},
+    {id:'douce',name:['Patate douce','Sweet potato','Boniato','Süßkartoffel'],price:55,body:'#d9783a',edge:'#8a4318',flesh:'#ffc27a',fry:'#ff9f4a'},
+    {id:'vitelotte',name:['Vitelotte','Vitelotte','Vitelotte','Vitelotte'],price:70,body:'#6b4a8c',edge:'#3d2757',flesh:'#b79ad6',fry:'#9b78c4'},
+    {id:'cape',name:['Super-Patate','Super Potato','Súper Patata','Super-Kartoffel'],premium:true,priceEur:'2,99 €',body:'#c8924b',edge:'#8c5f2b',flesh:'#f6e3a4',fry:'#f2c94c',
+     cape:true,desc:['Cape : plane pour ralentir la chute (↑ ou glisser vers le haut), recharge 7 s.','Cape: glide to slow the fall (↑ or swipe up), 7 s cooldown.','Capa: planea para frenar la caída (↑ o deslizar hacia arriba), recarga de 7 s.','Umhang: gleitet, um den Fall zu bremsen (↑ oder nach oben wischen), 7 s Abklingzeit.']},
+    {id:'stone',name:['Caillou-patate','Pebble Potato','Patata-piedra','Stein-Kartoffel'],premium:true,priceEur:'1,99 €',body:'#8d8f94',edge:'#464850',flesh:'#b9bcc4',fry:'#9fa3ac',
+     stone:true,speedMul:1.35,spark:.33,noMerge:true,
+     desc:['Tombe 35 % plus vite. Une lame a 1 chance sur 3 de ne faire qu’une étincelle, mais une coupe est définitive (pas de fusion).','Falls 35% faster. A blade has a 1 in 3 chance of only making a spark, but a cut is permanent (no merging).','Cae un 35 % más rápido. Una cuchilla tiene 1 posibilidad entre 3 de solo hacer una chispa, pero un corte es definitivo (sin fusión).','Fällt 35 % schneller. Eine Klinge erzeugt mit einer Chance von 1 zu 3 nur einen Funken, aber ein Schnitt ist endgültig (keine Verschmelzung).']},
+    {id:'magnet',name:['Patate aimant','Magnet Potato','Patata imán','Magnet-Kartoffel'],premium:true,priceEur:'1,99 €',body:'#8b7bd8',edge:'#4a3d99',flesh:'#d9d2ff',fry:'#b9aef0',
+     magnet:true,desc:['Attire les golds proches.','Attracts nearby gold.','Atrae el oro cercano.','Zieht Gold in der Nähe an.']}
+  ];
+  function skinById(id){ for(var i=0;i<SKINS.length;i++) if(SKINS[i].id===id) return SKINS[i]; return SKINS[0]; }
+  function curSkin(){ return (G&&G.skinOverride)?skinById(G.skinOverride):skinById(skinId); }
+  function applySkin(){ var s=curSkin(); T.potato=s.body; T.potatoEdge=s.edge; T.flesh=s.flesh; T.fry=s.fry; }
+
+  /* ---------- Équilibrage du mode scindé (à ajuster ici) ---------- */
+  var TUNE={
+    pieceSpeed:[1,.92,.85,.78],   // vitesse de chute selon le nombre de morceaux (1 à 4)
+    splitPulse:.4, splitDur:1.6,  // ralenti à chaque coupe : -40 % puis retour progressif sur 1,6 s
+    mergePulse:.2, mergeDur:.8,   // petit ralenti à la fusion, pour adoucir le retour à l'entier
+    butterRow:.22,                // chance de beurre par rangée quand on est scindé (avant : .35)
+    butterFirst:560               // distance du beurre garanti après une coupe (avant : 330)
+  };
+
+  /* ---------- Succès ---------- */
+  var ACHS=[
+    {id:'first',icon:'🥣',reward:5,name:['Première purée','First mash','Primer puré','Erstes Püree'],desc:['Finir écrasé pour la première fois.','Get mashed for the first time.','Acabar aplastado por primera vez.','Zum ersten Mal zerquetscht werden.']},
+    {id:'d100',icon:'⬇️',reward:10,name:['Plongeon','Dive','Zambullida','Kopfsprung'],desc:['Atteindre 100 m.','Reach 100 m.','Llegar a 100 m.','100 m erreichen.']},
+    {id:'d300',icon:'🕳️',reward:40,name:['Spéléologue','Spelunker','Espeleólogo','Höhlenforscher'],desc:['Atteindre 300 m.','Reach 300 m.','Llegar a 300 m.','300 m erreichen.']},
+    {id:'portion',icon:'🍟',reward:15,name:['Portion de frites','Order of fries','Ración de patatas fritas','Portion Pommes'],desc:['Te diviser en 4 morceaux.','Split into 4 pieces.','Dividirte en 4 trozos.','Dich in 4 Stücke teilen.']},
+    {id:'resurrection',icon:'🌅',reward:40,name:['Résurrection','Resurrection','Resurrección','Auferstehung'],desc:['Te diviser en 4 frites, puis redevenir une patate entière.','Split into 4 fries, then become a whole potato again.','Dividirte en 4 patatas fritas y volver a ser una patata entera.','In 4 Pommes zerfallen und wieder eine ganze Kartoffel werden.']},
+    {id:'quatrequarts',icon:'🍰',reward:25,secret:true,name:['Quatre-quarts','Four Quarters','Cuatro cuartos','Vier Viertel'],desc:['Tenir 10 s d’affilée à 4 morceaux.','Survive 10 s in a row as 4 pieces.','Aguantar 10 s seguidos con 4 trozos.','10 s am Stück mit 4 Stücken durchhalten.']},
+    {id:'fastfood',icon:'🍔',reward:10,secret:true,name:['Fast-food','Fast food','Comida rápida','Fast Food'],desc:['Finir écrasé en frites (3 morceaux ou plus).','Get crushed as fries (3 pieces or more).','Acabar aplastado hecho patatas fritas (3 trozos o más).','Als Pommes zerquetscht werden (3 Stücke oder mehr).']},
+    {id:'oven',icon:'♨️',reward:20,name:['Cuit à point','Cooked to perfection','En su punto','Auf den Punkt gegart'],desc:['Traverser un pilon grâce au Four.','Pass through a rolling pin thanks to the Oven.','Atravesar un rodillo gracias al Horno.','Dank Ofen durch ein Nudelholz hindurchgehen.']},
+    {id:'ketchup',icon:'🍅',reward:10,name:['Le ketchup sauve tout','Ketchup saves the day','El kétchup lo salva todo','Ketchup rettet alles'],desc:['Éviter une lame grâce au ketchup.','Dodge a blade thanks to ketchup.','Esquivar una cuchilla gracias al kétchup.','Eine Klinge dank Ketchup abwehren.']},
+    {id:'mayo',icon:'🥚',reward:10,name:['Mayo de secours','Emergency mayo','Mayonesa de emergencia','Notfall-Mayo'],desc:['Éviter un pilon grâce à la mayonnaise.','Dodge a rolling pin thanks to mayonnaise.','Esquivar un rodillo gracias a la mayonesa.','Ein Nudelholz dank Mayonnaise abwehren.']},
+    {id:'spark',icon:'✨',reward:20,secret:true,name:['Étincelle de génie','Spark of genius','Chispa de genialidad','Geistesblitz'],desc:['Faire une étincelle avec le caillou-patate.','Make a spark with the pebble potato.','Sacar una chispa con la patata-piedra.','Mit der Stein-Kartoffel einen Funken schlagen.']},
+    {id:'poppins',icon:'🪂',reward:25,name:['Mary Poppins','Mary Poppins','Mary Poppins','Mary Poppins'],desc:['Planer 5 fois dans la même partie.','Glide 5 times in the same run.','Planear 5 veces en la misma partida.','5-mal in derselben Runde gleiten.']},
+    {id:'picsou',icon:'🦆',reward:30,name:['Oncle Picsou','Scrooge McDuck','Tío Gilito','Dagobert Duck'],desc:['Ramasser 40 golds dans une partie.','Collect 40 gold in one run.','Recoger 40 de oro en una partida.','40 Gold in einer Runde einsammeln.']},
+    {id:'ascete',icon:'🧘',reward:30,secret:true,name:['Ascète','Ascetic','Asceta','Asket'],desc:['Atteindre 100 m sans ramasser le moindre gold.','Reach 100 m without collecting any gold.','Llegar a 100 m sin recoger nada de oro.','100 m erreichen, ohne Gold einzusammeln.']},
+    {id:'chaud',icon:'🔥',reward:20,name:['Chaud devant !','Hot stuff!','¡Cuidado, que quema!','Heiß, heiß!'],desc:['Atteindre la poêle.','Reach the frying pan.','Llegar a la sartén.','Die Pfanne erreichen.']},
+    {id:'frigo',icon:'🧊',reward:30,name:['Patate surgelée','Frozen potato','Patata congelada','Tiefkühlkartoffel'],desc:['Atteindre le congélateur.','Reach the freezer.','Llegar al congelador.','Den Gefrierschrank erreichen.']},
+    {id:'camion',icon:'🚚',reward:10,name:['Livraison express','Express delivery','Entrega urgente','Expresslieferung'],desc:['Atteindre le camion.','Reach the truck.','Llegar al camión.','Den Lastwagen erreichen.']},
+    {id:'poubelle',icon:'🗑️',reward:60,name:['Poubelle la vie','Trashed','A la basura','Ab in die Tonne'],desc:['Atteindre la poubelle.','Reach the trash can.','Llegar al cubo de basura.','Die Mülltonne erreichen.']},
+    {id:'neant',icon:'⚫',reward:100,secret:true,name:['Dans le néant','Into the void','En la nada','Ins Nichts'],desc:['Atteindre le néant.','Reach the void.','Llegar a la nada.','Das Nichts erreichen.']},
+    {id:'cadeau',icon:'🎁',reward:15,name:['Cadeau tombé du ciel','Gift from the sky','Regalo caído del cielo','Geschenk des Himmels'],desc:['Attraper un bonus pendant la chute.','Catch a bonus during the fall.','Atrapar un bonus durante la caída.','Einen Bonus während des Falls fangen.']},
+    {id:'jackpot',icon:'🌈',reward:60,secret:true,name:['Jackpot','Jackpot','¡Jackpot!','Jackpot'],desc:['Attraper un bonus légendaire.','Catch a legendary bonus.','Atrapar un bonus legendario.','Einen legendären Bonus fangen.']},
+    {id:'accro',icon:'🔁',reward:20,name:['Accro','Hooked','Enganchado','Süchtig'],desc:['Jouer 10 parties.','Play 10 runs.','Jugar 10 partidas.','10 Runden spielen.']},
+    {id:'garderobe',icon:'👗',reward:25,name:['Garde-robe','Wardrobe','Armario','Garderobe'],desc:['Posséder 3 skins.','Own 3 skins.','Tener 3 skins.','3 Skins besitzen.']}
+  ];
+  var ACH_BY={}; ACHS.forEach(function(a){ ACH_BY[a.id]=a; });
+  function unlock(id){
+    var a=ACH_BY[id]; if(!a||ach[id]) return;
+    ach[id]=true; wallet+=a.reward; save();
+    if(G&&G.achRun) G.achRun.push(a);
+    toast('🏆 '+X(a.name)+' · +'+a.reward+' 🪙'); beep(988,.12,'triangle',.06,500);
+  }
+
+  /* ---------- Bonus aléatoires pendant la chute ---------- */
+  var TIERS=[
+    {name:'Commun',color:'#3ddc6b',p:.70},
+    {name:'Rare',color:'#4aa3ff',p:.22},
+    {name:'Épique',color:'#b36bff',p:.07},
+    {name:'Légendaire',color:'#ffd23f',p:.01}
+  ];
+  var BONUSES=[
+    {id:'ketchup',tier:0,icon:'🍅',name:['Ketchup','Ketchup','Kétchup','Ketchup']},
+    {id:'mayo',tier:0,icon:'🥚',name:['Mayonnaise','Mayonnaise','Mayonesa','Mayonnaise']},
+    {id:'purse',tier:0,icon:'💰',name:['Sac de golds','Bag of gold','Bolsa de oro','Goldbeutel']},
+    {id:'butter',tier:1,icon:'🧈',name:['Beurre salé','Salted butter','Mantequilla salada','Gesalzene Butter']},
+    {id:'oven',tier:1,icon:'♨️',name:['Four express','Express oven','Horno exprés','Express-Ofen']},
+    {id:'feather',tier:1,icon:'🪶',name:['Plume','Feather','Pluma','Feder']},
+    {id:'pepper',tier:1,icon:'🧂',name:['Sauce poivre','Pepper sauce','Salsa de pimienta','Pfeffersoße']},
+    {id:'mustard',tier:1,icon:'🌭',name:['Moutarde','Mustard','Mostaza','Senf']},
+    {id:'magnet',tier:2,icon:'🧲',name:['Aimant','Magnet','Imán','Magnet']},
+    {id:'star',tier:2,icon:'⭐',name:['Étoile','Star','Estrella','Stern']},
+    {id:'loan',tier:3,icon:'🌈',name:['Skin légendaire','Legendary skin','Skin legendaria','Legendärer Skin']},
+    {id:'rain',tier:3,icon:'💎',fallback:true,name:['Pluie d’or','Golden rain','Lluvia de oro','Goldregen']}
+  ];
+  var BONUS_BY={}; BONUSES.forEach(function(b){ BONUS_BY[b.id]=b; });
+  function rollBonus(){
+    var P=devOn()?[.4,.3,.2,.1]:TIERS.map(function(t){return t.p}), r=Math.random(), acc=0, t=TIERS.length-1;
+    for(var i=0;i<P.length;i++){ acc+=P[i]; if(r<acc){ t=i; break; } }
+    var prem=!!curSkin().premium;
+    var pool=BONUSES.filter(function(b){ return b.tier===t && !(b.id==='loan'&&prem) && !(b.fallback&&!prem); });
+    return pool[Math.floor(Math.random()*pool.length)];
+  }
+
+  /* ---------- Réglages & sauvegarde ---------- */
+  var settings={control:'tilt',mode:'classic',sound:'on',dev:'off',lang:detectLang(),hitbox:'off'}, best=0, wallet=0;
+  var inv={ketchup:0,mayo:0,mustard:0,hot:0,pepper:0,ladle:0,timer:0,peeler:0,oven:0};
+  var skinId='classic', ownedSkins={classic:true};
+  var ach={}, stats={runs:0};
+  function devOn(){ return settings.dev==='on'; }
+  function isOwned(sk){ return !!ownedSkins[sk.id]||devOn(); }
+  try{
+    var saved=JSON.parse(localStorage.getItem('pdp_v1')||'{}');
+    ['control','mode','sound','dev','lang'].forEach(function(k){ if(saved[k]) settings[k]=saved[k]; });
+    best=+saved.best||0; wallet=+saved.wallet||0;
+    if(saved.inv) Object.keys(inv).forEach(function(k){ inv[k]=+saved.inv[k]||0; });
+    if(saved.skin) skinId=saved.skin;
+    if(saved.ach) ach=saved.ach;
+    if(saved.stats) stats.runs=+saved.stats.runs||0;
+    if(saved.owned) ownedSkins=saved.owned;
+    ownedSkins.classic=true; skinId=skinById(skinId).id;
+    if(skinById(skinId).premium&&!isOwned(skinById(skinId))) skinId='classic';
+  }catch(e){}
+  function save(){
+    try{
+      localStorage.setItem('pdp_v1',JSON.stringify({control:settings.control,mode:settings.mode,sound:settings.sound,dev:settings.dev,lang:settings.lang,
+        best:best,wallet:wallet,inv:inv,skin:skinId,owned:ownedSkins,ach:ach,stats:stats}));
+    }catch(e){}
+  }
+
+  /* ---------- Thème & taille ---------- */
+  var W=0,H=0,DPR=1,T={};
+  function readTheme(){
+    var s=getComputedStyle(document.documentElement);
+    var g=function(n){return s.getPropertyValue(n).trim()};
+    T={laneA:g('--lane-a'),laneB:g('--lane-b'),line:g('--line'),ink:g('--ink'),pin:g('--pin'),metal:g('--metal'),
+       metalDark:g('--metal-dark'),danger:g('--danger'),potato:g('--potato'),potatoEdge:g('--potato-edge'),
+       flesh:g('--flesh'),fry:g('--fry')};
+    applySkin();
+  }
+  function resize(){
+    DPR=Math.min(2,window.devicePixelRatio||1);
+    var r=cv.getBoundingClientRect(); W=r.width; H=r.height;
+    cv.width=Math.max(1,Math.round(W*DPR)); cv.height=Math.max(1,Math.round(H*DPR));
+    readTheme();
+  }
+  window.addEventListener('resize',resize);
+  window.addEventListener('orientationchange',function(){setTimeout(resize,200)});
+  if(window.matchMedia) try{ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',readTheme); }catch(e){}
+
+  /* ---------- Décors par paliers ---------- */
+  var BIOME_LEN=6000; // 100 m
+  var BIOMES=[
+    {name:['Le champ de patates 🌱','The potato field 🌱','El campo de patatas 🌱','Das Kartoffelfeld 🌱'],a:'#a9c26b',b:'#9db55f',line:'#6f8a3a',ink:'#27330f',deco:'sprouts'},
+    {name:['Le camion 🚚','The truck 🚚','El camión 🚚','Der Lastwagen 🚚'],a:'#8d99a6',b:'#818e9b',line:'#5f6c79',ink:'#0f1a24',deco:'ridges',ach:'camion'},
+    {name:['Le supermarché 🏪','The supermarket 🏪','El supermercado 🏪','Der Supermarkt 🏪'],a:'#f4f7fb',b:'#e8eef6',line:'#bccbe0',ink:'#1d2b44',deco:'checker'},
+    {name:['Le caddie 🛒','The shopping cart 🛒','El carrito 🛒','Der Einkaufswagen 🛒'],a:'#cfd6dd',b:'#c4ccd4',line:'#8f9aa6',ink:'#1b2530',deco:'grid'},
+    {name:['Le sac de course 🛍️','The shopping bag 🛍️','La bolsa de la compra 🛍️','Die Einkaufstüte 🛍️'],a:'#c9a56c',b:'#bf9a60',line:'#946f3a',ink:'#2e2110',deco:'creases'},
+    {name:['Le coffre de voiture 🚗','The car trunk 🚗','El maletero 🚗','Der Kofferraum 🚗'],a:'#3a3d44',b:'#34373d',line:'#5a5e68',ink:'#eceef2',deco:'speckle'},
+    {name:['Le frigo 🧊','The fridge 🧊','La nevera 🧊','Der Kühlschrank 🧊'],a:'#e9f4f1',b:'#dcebe7',line:'#a9c9c0',ink:'#17332c',deco:'shelves'},
+    {name:['La planche à découper 🔪','The cutting board 🔪','La tabla de cortar 🔪','Das Schneidebrett 🔪'],a:'#e0b878',b:'#d7ac6a',line:'#b08040',ink:'#3a2410',deco:'grain'},
+    {name:['La poêle 🔥','The frying pan 🔥','La sartén 🔥','Die Pfanne 🔥'],a:'#5a2a1c',b:'#6b3320',line:'#9b4a2a',ink:'#ffe3c2',deco:'flames',ach:'chaud'},
+    {name:['L’assiette 🍽️','The plate 🍽️','El plato 🍽️','Der Teller 🍽️'],a:'#fdfcf8',b:'#f3f1ea',line:'#d9a089',ink:'#1c2a4a',deco:'splat'},
+    {name:['Le congélateur ❄️','The freezer ❄️','El congelador ❄️','Der Gefrierschrank ❄️'],a:'#dff3fb',b:'#cdeaf6',line:'#a9d3e6',ink:'#1f3a4a',deco:'snow',ach:'frigo'},
+    {name:['La poubelle 🗑️','The trash can 🗑️','El cubo de basura 🗑️','Die Mülltonne 🗑️'],a:'#3b4034',b:'#343a2e',line:'#5d6850',ink:'#e9efd9',deco:'trash',ach:'poubelle'},
+    {name:['Le néant ⚫','The void ⚫','La nada ⚫','Das Nichts ⚫'],a:'#07070b',b:'#0b0b12',line:'#34344d',ink:'#e6e6f5',deco:'stars',ach:'neant'}
+  ];
+  function parseCol(s){
+    s=(s||'').trim(); var m;
+    if((m=/^#([0-9a-f]{6})$/i.exec(s))) return [parseInt(m[1].slice(0,2),16),parseInt(m[1].slice(2,4),16),parseInt(m[1].slice(4,6),16)];
+    if((m=/^#([0-9a-f]{3})$/i.exec(s))) return m[1].split('').map(function(c){return parseInt(c+c,16)});
+    if((m=/rgba?\(([^)]+)\)/.exec(s))){ var a=m[1].split(','); return [+a[0],+a[1],+a[2]]; }
+    return [255,241,214];
+  }
+  function mixCol(c1,c2,f){
+    return 'rgb('+[0,1,2].map(function(i){return Math.round(c1[i]+(c2[i]-c1[i])*f)}).join(',')+')';
+  }
+  function biomeCols(i){
+    var b=BIOMES[i];
+    return {a:parseCol(b.a),b:parseCol(b.b),line:parseCol(b.line),ink:parseCol(b.ink),deco:b.deco};
+  }
+  function palette(D){
+    var last=BIOMES.length-1, seg=D/BIOME_LEN, fl=Math.floor(seg), i=Math.min(fl,last), f=seg-fl, A=biomeCols(i);
+    var fm=(i<last&&f>.9)?(f-.9)/.1:0, B=fm>0?biomeCols(i+1):A;
+    return {a:mixCol(A.a,B.a,fm),b:mixCol(A.b,B.b,fm),line:mixCol(A.line,B.line,fm),ink:mixCol(A.ink,B.ink,fm),deco:(i<last&&f>.95)?B.deco:A.deco};
+  }
+  function hash(k,s){ var x=Math.sin(k*127.1+s*311.7)*43758.5453; return x-Math.floor(x); }
+
+  /* ---------- Son / vibration / toast ---------- */
+  var ac=null;
+  function beep(f,d,type,vol,slide){
+    if(settings.sound!=='on') return;
+    try{
+      if(!ac) ac=new (window.AudioContext||window.webkitAudioContext)();
+      var o=ac.createOscillator(), g=ac.createGain(), t=ac.currentTime;
+      o.type=type||'sine'; o.frequency.setValueAtTime(f,t);
+      if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(40,f+slide),t+d);
+      g.gain.setValueAtTime(vol||.07,t); g.gain.exponentialRampToValueAtTime(.0001,t+d);
+      o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+d);
+    }catch(e){}
+  }
+  function vib(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
+  var toastT;
+  var toastQ=[], toastBusy=false;
+  function toast(m){ toastQ.push(m); if(toastQ.length>5) toastQ.shift(); if(!toastBusy) nextToast(); }
+  function nextToast(){
+    var m=toastQ.shift();
+    if(!m){ toastBusy=false; return; }
+    toastBusy=true;
+    var t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastT);
+    toastT=setTimeout(function(){ t.classList.remove('show'); setTimeout(nextToast,280); },2400);
+  }
+
+  /* ---------- Entrées ---------- */
+  var tiltX=0, tiltSeen=false, tiltBound=false, tapDir=0, keyDir=0, activeControl='tap';
+  var touches=new Map(), starts=new Map();
+  function updateTap(){ var d=0; touches.forEach(function(v){d+=v}); tapDir=clamp(d,-1,1); }
+  cv.addEventListener('pointerdown',function(e){
+    var r=cv.getBoundingClientRect();
+    touches.set(e.pointerId, e.clientX<r.left+r.width/2?-1:1); updateTap();
+    starts.set(e.pointerId,{x:e.clientX,y:e.clientY,t:performance.now(),fired:false});
+  });
+  cv.addEventListener('pointermove',function(e){
+    var s=starts.get(e.pointerId);
+    if(s&&!s.fired&&s.y-e.clientY>45){ s.fired=true; tryGlide(); }
+  });
+  ['pointerup','pointercancel','pointerleave'].forEach(function(ev){
+    cv.addEventListener(ev,function(e){
+      var s=starts.get(e.pointerId);
+      if(ev==='pointerup'&&s&&!s.fired&&activeControl==='tilt'&&performance.now()-s.t<350&&Math.abs(e.clientX-s.x)<14&&Math.abs(e.clientY-s.y)<14) tryGlide();
+      starts.delete(e.pointerId); touches.delete(e.pointerId); updateTap();
+    });
+  });
+  window.addEventListener('keydown',function(e){
+    if(e.key===' '||e.key==='Escape'||e.key==='p'||e.key==='P'){
+      if(state==='play'||state==='countdown'){ e.preventDefault(); pause(); return; }
+      if(state==='paused'){ e.preventDefault(); resume(); return; }
+    }
+    if(e.key==='ArrowLeft'||e.key==='a'||e.key==='q') keyDir=-1;
+    else if(e.key==='ArrowRight'||e.key==='d') keyDir=1;
+    else if(e.key==='ArrowUp'||e.key==='w'||e.key==='z') tryGlide();
+    else if((e.key==='Enter'||e.key===' ')&&state!=='play'&&$('shop').classList.contains('hidden')&&$('ach').classList.contains('hidden')){
+      e.preventDefault(); if(state==='over') startGame(); else $('play').click();
+    }
+  });
+  window.addEventListener('keyup',function(e){
+    if(['ArrowLeft','a','q','ArrowRight','d'].indexOf(e.key)>=0) keyDir=0;
+  });
+  function onOrient(e){
+    if(e.gamma==null) return;
+    tiltSeen=true;
+    var v=clamp(e.gamma/28,-1,1);
+    tiltX=Math.abs(v)<.06?0:v;
+  }
+  function enableTilt(){
+    return Promise.resolve().then(function(){
+      if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){
+        return DeviceOrientationEvent.requestPermission().then(function(r){return r==='granted'});
+      }
+      return true;
+    }).then(function(ok){
+      if(ok && !tiltBound){ window.addEventListener('deviceorientation',onOrient); tiltBound=true; }
+      return ok;
+    }).catch(function(){return false});
+  }
+  function getInput(){
+    if(keyDir) return keyDir;
+    return activeControl==='tilt'?tiltX:tapDir;
+  }
+
+  /* ---------- État du jeu ---------- */
+  var state='menu', G=null;
+  var MAXP=4;
+  function mkPiece(x,startD){
+    return {x:x,obs:[],pick:[],nextD:startD,inv:0,oven:0,wob:Math.random()*6,scared:false,seed:Math.random()*50};
+  }
+  function newGame(){
+    G={D:0,t:0,score:0,vx:0,lost:0,gold:0,bi:0,banner:null,ketchup:0,mayo:0,glide:0,glideCd:0,
+       skinOverride:null,achRun:[],reached4:false,t4:0,glides:0,magnetT:0,bonuses:0,pepper:false,mustard:false,hot:false,pepperT:0,cd:0,slowT:0,slowDur:1,slowAmp:0,flash:0,nm:1,
+       pieces:[mkPiece(.5,H*.9)],parts:[],shake:0};
+    applySkin();
+  }
+  function dims(){
+    var n=G.pieces.length, lw=W/n, r=Math.min(26,lw*.12);
+    return {n:n,lw:lw,r:r,rf:r/lw};
+  }
+  /* Géométrie des obstacles : s'adapte au nombre de colonnes (plus facile quand l'écran est scindé) */
+  function gapOf(o){
+    var n=G.pieces.length, gw=Math.min(.84,o.gw*(1+.2*(n-1))), m=gw/2+.03;
+    return {c:clamp(o.base+o.amp*Math.sin(G.t*1.7+o.ph),m,1-m),gw:gw};
+  }
+  function blockOf(o){
+    var n=G.pieces.length, w=o.w*(1-.12*(n-1));
+    return {w:w,c:clamp(o.cx+o.amp*Math.sin(G.t*1.4+o.ph),.1,.9)};
+  }
+  function hitTest(o,p,lw,r,rf){
+    var dy=o.d-G.D;
+    if(o.kind==='gap'){
+      var th=o.type==='blade'?13:15;
+      if(Math.abs(dy)>=th+r*.8) return false;
+      var g=gapOf(o), xr=rf*.85;
+      return p.x-xr<g.c-g.gw/2 || p.x+xr>g.c+g.gw/2;
+    }
+    var b=blockOf(o), dx=(p.x-b.c)*lw;
+    if(o.type==='blade'){ var R=b.w*lw/2+r*.75; return dx*dx+dy*dy<R*R; }
+    return Math.abs(dy)<15+r*.8 && Math.abs(dx)<b.w*lw/2+r*.8;
+  }
+  function corridorOk(c1,w1,c2,w2){
+    var a=[[c1-w1/2,c1+w1/2],[c2-w2/2,c2+w2/2]].sort(function(x,y){return x[0]-y[0]});
+    var left=a[0][0], mid=Math.max(0,a[1][0]-a[0][1]), right=1-Math.max(a[0][1],a[1][1]);
+    return Math.max(left,mid,right)>=.3;
+  }
+  function genObs(p){
+    var SK=curSkin();
+    while(p.nextD<G.D+H*1.15){
+      var d=G.D, n=G.pieces.length;
+      var bladeChance=d<1500?0:Math.min(.38,.12+d/60000);
+      var tp=function(){return Math.random()<bladeChance?'blade':'pin'};
+      var rk=Math.random(), kind;
+      if(d<1200) kind=rk<.6?'gap':'block';
+      else if(d<3000) kind=rk<.45?'gap':'block';
+      else kind=rk<.35?'gap':(rk<.65?'block':'duo');
+      var amp=d<5000?0:Math.min(.14,(d-5000)/150000);
+      if(kind==='gap'){
+        var gw=Math.max(.42,.62-d/90000), m=gw/2+.03;
+        p.obs.push({kind:'gap',type:tp(),d:p.nextD,gw:gw,base:m+Math.random()*(1-2*m),amp:amp,ph:Math.random()*6.28,hit:false});
+      }else if(kind==='block'){
+        p.obs.push({kind:'block',type:tp(),d:p.nextD,w:.3+Math.random()*.2,cx:.2+Math.random()*.6,amp:Math.min(amp,.1),ph:Math.random()*6.28,hit:false});
+      }else{
+        var w1,w2,c1,c2,tries=0;
+        do{ w1=.18+Math.random()*.08; w2=.18+Math.random()*.08; c1=.1+Math.random()*.8; c2=.1+Math.random()*.8; tries++; }
+        while(tries<8 && !corridorOk(c1,w1,c2,w2));
+        if(!corridorOk(c1,w1,c2,w2)){ c1=.2; c2=.8; w1=.2; w2=.2; }
+        var off=(Math.random()<.5?-1:1)*(30+Math.random()*45);
+        p.obs.push({kind:'block',type:tp(),d:p.nextD,w:w1,cx:c1,amp:0,ph:0,hit:false});
+        p.obs.push({kind:'block',type:tp(),d:p.nextD+off,w:w2,cx:c2,amp:0,ph:0,hit:false});
+      }
+      var s=Math.max(165,300-d/90)*(.85+Math.random()*.35)*(1+.3*(n-1));
+      /* Beurre (fusion) et golds : plus on descend, plus il y a de golds, en grappes de plus en plus longues */
+      if(n>=2&&!SK.noMerge&&Math.random()<TUNE.butterRow){
+        p.pick.push({k:'fuse',d:p.nextD+s/2,x:.15+Math.random()*.7,taken:false});
+      }else if(Math.random()<Math.min(.85,.4+d/25000)){
+        var cnt=1+Math.min(4,Math.floor(d/8000))+(Math.random()<.35?1:0);
+        cnt=Math.min(5,cnt);
+        var gx=.15+Math.random()*.7;
+        for(var gi=0;gi<cnt;gi++){
+          p.pick.push({k:'gold',d:p.nextD+s*.2+gi*30,x:clamp(gx+Math.sin(gi*1.3)*.07,.12,.88),taken:false});
+        }
+      }
+      if(Math.random()<.035*(devOn()?8:1)){
+        var bn=rollBonus();
+        p.pick.push({k:'bonus',b:bn.id,tier:bn.tier,d:p.nextD+s*.55,x:.15+Math.random()*.7,taken:false});
+      }
+      p.nextD+=s;
+    }
+    p.obs=p.obs.filter(function(o){return o.d>=G.D-H*.3-160});
+    p.pick=p.pick.filter(function(k){return !k.taken&&k.d>=G.D-H*.3-60});
+  }
+  function pulse(amp,dur){
+    var cur=G.slowT>0?G.slowAmp*Math.pow(G.slowT/G.slowDur,2):0;
+    if(amp>=cur){ G.slowT=dur; G.slowDur=dur; G.slowAmp=amp; }
+  }
+  function goldMul(){ var m=1; if(G.pepper||G.pepperT>0) m+=1; if(G.hot) m+=2; return m; }
+  function tm(){ return inv.timer>0?1.25:1; }
+  function priceOf(base){ return Math.max(1,Math.round(base*(inv.peeler>0?.85:1))); }
+  function tryGlide(){
+    if(state!=='play'||!G||!curSkin().cape) return;
+    if(G.glide>0||G.glideCd>0) return;
+    G.glide=1.6; G.glideCd=7; G.glides++; if(G.glides>=5) unlock('poppins');
+    beep(300,.35,'sine',.05,200); vib(15);
+  }
+  function lanePos(i,n,p){ var lw=W/n; return {x:i*lw+p.x*lw, lw:lw}; }
+  function burst(x,y,n,cols){
+    for(var i=0;i<n;i++) G.parts.push({
+      x:x,y:y,vx:(Math.random()-.5)*380,vy:(Math.random()-.85)*320,
+      life:.6+Math.random()*.5,max:1.1,c:cols[i%cols.length],s:3+Math.random()*5
+    });
+  }
+  function split(p){
+    var i=G.pieces.indexOf(p), n=G.pieces.length, py=H*.3, pos=lanePos(i,n,p);
+    var ox=p.x, q=mkPiece(0,G.D+480);
+    p.x=clamp(ox-.17,.12,.88); q.x=clamp(ox+.17,.12,.88);
+    p.inv=.8; q.inv=1;
+    var bake=((inv.oven>0?5:0)+(G.mustard?4:0))*tm(); if(bake>0){ p.oven=bake; q.oven=bake; }
+    if(!curSkin().noMerge) q.pick.push({k:'fuse',d:G.D+TUNE.butterFirst,x:.3+Math.random()*.4,taken:false}); // de quoi refusionner assez vite
+    G.pieces.splice(i+1,0,q);
+    if(G.pieces.length>=4){ G.reached4=true; unlock('portion'); }
+    pulse(TUNE.splitPulse,TUNE.splitDur); G.flash=1;
+    burst(pos.x,py,16,[T.fry,'#ffffff',T.metal]);
+    beep(520,.14,'square',.05,420); vib(25);
+  }
+  function afterMerge(){ if(G.pieces.length===1&&G.reached4) unlock('resurrection'); }
+  function mergeInto(p){
+    var i=G.pieces.indexOf(p), n=G.pieces.length; if(n<2) return;
+    var j=i+1<n?i+1:i-1, pos=lanePos(i,n,p);
+    G.pieces.splice(j,1);
+    p.inv=Math.max(p.inv,.9);
+    pulse(TUNE.mergePulse,TUNE.mergeDur);
+    afterMerge();
+    burst(pos.x,H*.3,18,['#ffe27a','#ffffff',T.fry]);
+    beep(420,.2,'sine',.07,520); vib(20);
+  }
+  function crush(p){
+    var i=G.pieces.indexOf(p), n=G.pieces.length, py=H*.3, pos=lanePos(i,n,p);
+    burst(pos.x,py,30,[T.potato,T.flesh,T.fry,T.potatoEdge]);
+    G.shake=.28; beep(190,.28,'sawtooth',.09,-130); vib(60);
+    if(settings.mode==='classic' || n===1){ if(n>=3) unlock('fastfood'); gameOver(); return; }
+    G.pieces.splice(i,1); G.lost++;
+  }
+  function gameOver(){
+    setState('over');
+    var isRecord=G.score>best;
+    if(isRecord) best=G.score;
+    wallet+=G.gold; stats.runs++; save();
+    unlock('first'); if(stats.runs>=10) unlock('accro');
+    $('finalScore').textContent=G.score+' m';
+    $('finalBest').textContent=isRecord?tr('new_record'):tr('record',best);
+    $('finalGold').textContent=tr('total',G.gold,wallet);
+    $('finalAch').textContent=G.achRun.length?'🏆 '+G.achRun.map(function(a){return X(a.name)+' (+'+a.reward+')'}).join(' · '):'';
+    setTimeout(function(){ if(state==='over') $('over').classList.remove('hidden'); },550);
+  }
+  function applyBonus(pk,p){
+    var b=BONUS_BY[pk.b], SK=curSkin(), n=G.pieces.length, pos=lanePos(G.pieces.indexOf(p),n,p), k=tm();
+    if(b.id==='loan'&&SK.premium) b=BONUS_BY.rain;
+    var col=TIERS[pk.tier].color, nm=b.icon+' '+X(b.name), msg=nm+' !';
+    burst(pos.x,H*.3,pk.tier===3?40:14,[col,'#ffffff']);
+    beep(620+pk.tier*130,.18,'triangle',.07,300+pk.tier*100); vib(pk.tier>=2?40:15);
+    G.bonuses++;
+    switch(b.id){
+      case 'ketchup': G.ketchup++; msg=nm+' ×'+G.ketchup; break;
+      case 'mayo': G.mayo++; msg=nm+' ×'+G.mayo; break;
+      case 'purse': G.gold+=8; msg=b.icon+' '+tr('b_purse'); break;
+      case 'butter':
+        if(SK.noMerge){ G.gold+=10; msg=tr('b_butter_stone'); }
+        else if(n<2){ G.gold+=6; msg=tr('b_butter_whole'); }
+        else{ G.pieces=[p]; p.inv=Math.max(p.inv,1); pulse(TUNE.mergePulse,TUNE.mergeDur); afterMerge(); msg=tr('b_butter_ok'); }
+        break;
+      case 'oven':
+        G.pieces.forEach(function(q){ q.oven=Math.min(25,Math.max(0,q.oven)+8*k); }); msg=nm+' '+tr('b_oven_note',Math.round(8*k)); break;
+      case 'feather':
+        G.glide=Math.min(9,Math.max(0,G.glide)+3*k); msg=nm+' '+tr('b_feather_note'); break;
+      case 'pepper':
+        G.pepperT=Math.min(60,Math.max(0,G.pepperT)+20*k); msg=nm+' (×2 · '+Math.round(20*k)+' s)'; break;
+      case 'mustard':
+        G.mustard=true; msg=nm+' '+tr('b_mustard_note'); break;
+      case 'magnet':
+        G.magnetT=Math.min(45,Math.max(0,G.magnetT)+15*k); msg=nm+' ('+Math.round(15*k)+' s)'; break;
+      case 'star':
+        G.pieces.forEach(function(q){ q.inv=Math.min(18,Math.max(0,q.inv)+6*k); }); msg=nm+' '+tr('b_star_note',Math.round(6*k)); break;
+      case 'rain':
+        var amt=50*goldMul(); G.gold+=amt; msg=nm+' '+tr('b_gold',amt); break;
+      case 'loan':
+        var cands=SKINS.filter(function(s2){return s2.premium&&s2.id!==SK.id});
+        var sk=cands[Math.floor(Math.random()*cands.length)];
+        G.skinOverride=sk.id; applySkin(); G.glide=0; G.glideCd=0; G.shake=.15;
+        G.banner={text:'🌈 '+X(sk.name),t:0};
+        msg='🌈 '+X(sk.name)+tr('b_loan')+(sk.cape?' '+tr('b_loan_cape'):'');
+        break;
+    }
+    if(G.gold>=40) unlock('picsou');
+    toast(msg);
+    unlock('cadeau'); if(pk.tier===3) unlock('jackpot');
+  }
+  function stepParts(dt){
+    for(var i=G.parts.length-1;i>=0;i--){
+      var q=G.parts[i]; q.life-=dt; if(q.life<=0){G.parts.splice(i,1);continue;}
+      q.vy+=900*dt; q.x+=q.vx*dt; q.y+=q.vy*dt;
+    }
+    G.shake=Math.max(0,G.shake-dt*1.6);
+  }
+  function update(dt){
+    var SK=curSkin();
+    G.t+=dt;
+    var target=getInput()*1.55;
+    G.vx+=(target-G.vx)*Math.min(1,9*dt);
+    var ease=Math.min(1,.4+G.t/1.2);
+    var malus=settings.mode==='survive'?1+.22*G.lost:1;
+    var nt=TUNE.pieceSpeed[Math.min(G.pieces.length,4)-1]; G.nm+=(nt-G.nm)*Math.min(1,3*dt); var nmul=G.nm;
+    var pm=1; if(G.slowT>0){ G.slowT-=dt; var rt=Math.max(0,G.slowT)/G.slowDur; pm=1-G.slowAmp*rt*rt; }
+    if(G.flash>0) G.flash=Math.max(0,G.flash-dt*4);
+    if(G.glide>0) G.glide-=dt;
+    if(G.glideCd>0) G.glideCd-=dt;
+    if(G.magnetT>0) G.magnetT-=dt;
+    if(G.pepperT>0) G.pepperT-=dt;
+    var gmul=G.glide>0?.45:1;
+    var smul=(SK.speedMul||1)*(G.hot?1.2:1);
+    G.D+=(210+Math.min(320,G.D*.018))*malus*nmul*pm*ease*gmul*smul*dt;
+    G.score=Math.floor(G.D/60);
+    if(G.score>=100) unlock('d100');
+    if(G.score>=300) unlock('d300');
+    if(G.score>=100&&G.gold===0) unlock('ascete');
+    var bi=Math.min(Math.floor(G.D/BIOME_LEN),BIOMES.length-1);
+    if(bi!==G.bi){ G.bi=bi; G.banner={text:X(BIOMES[bi].name),t:0}; if(BIOMES[bi].ach) unlock(BIOMES[bi].ach); }
+    if(G.pieces.length>=4){ G.t4+=dt; if(G.t4>=10) unlock('quatrequarts'); } else G.t4=0;
+    if(G.banner){ G.banner.t+=dt; if(G.banner.t>2.6) G.banner=null; }
+
+    var list=G.pieces.slice();
+    for(var k=0;k<list.length;k++){
+      var p=list[k];
+      if(G.pieces.indexOf(p)<0) continue;
+      var dm=dims();
+      p.x=clamp(p.x+G.vx*dt,dm.rf,1-dm.rf);
+      if(p.inv>0) p.inv-=dt;
+      if(p.oven>0) p.oven-=dt;
+      genObs(p);
+      p.scared=false;
+
+      var mag=!!(SK.magnet||G.magnetT>0);
+      var reach=dm.r+(inv.ladle>0?40:14)+(mag?20:0);
+      for(var m=0;m<p.pick.length;m++){
+        var pk=p.pick[m]; if(pk.taken) continue;
+        if(mag&&pk.k==='gold'&&Math.abs(pk.d-G.D)<190) pk.x+=(p.x-pk.x)*Math.min(1,3.5*dt);
+        if(Math.abs(pk.d-G.D)<reach && Math.abs(p.x-pk.x)*dm.lw<reach){
+          pk.taken=true;
+          if(pk.k==='gold'){
+            G.gold+=goldMul(); if(G.gold>=40) unlock('picsou'); beep(880+Math.min(G.gold,12)*18,.08,'triangle',.05,220);
+            burst(dm.lw*G.pieces.indexOf(p)+pk.x*dm.lw,H*.3,6,['#ffd23f','#fff3b0']);
+          }else if(pk.k==='bonus'){ applyBonus(pk,p); break; }
+          else{ mergeInto(p); break; }
+        }
+      }
+      dm=dims();
+      if(G.pieces.indexOf(p)<0) continue;
+
+      for(var j=0;j<p.obs.length;j++){
+        var o=p.obs[j]; if(o.hit) continue;
+        var dy=o.d-G.D;
+        if(dy>0&&dy<170) p.scared=true;
+        if(!hitTest(o,p,dm.lw,dm.r,dm.rf)) continue;
+        if(p.inv>0) continue;
+        if(o.type==='pin'&&p.oven>0){ unlock('oven'); continue; }
+        o.hit=true;
+        var ip=G.pieces.indexOf(p), pos=lanePos(ip,dm.n,p);
+        if(o.type==='blade'){
+          if(SK.spark&&Math.random()<SK.spark){
+            unlock('spark'); burst(pos.x,H*.3,24,['#ffd23f','#ff9a1f','#ffffff']); G.shake=.1;
+            beep(1400,.09,'square',.05,-500); vib(15);
+          }
+          else if(G.ketchup>0){ G.ketchup--; burst(pos.x,H*.3,16,['#d1432f','#ff8a73']); toast(tr('toast_ketchup')); beep(300,.15,'triangle',.06,200); unlock('ketchup'); }
+          else if(G.pieces.length<MAXP) split(p);
+          else crush(p);
+        }else{
+          if(G.mayo>0){ G.mayo--; burst(pos.x,H*.3,16,['#fff3c4','#ffffff']); toast(tr('toast_mayo')); beep(300,.15,'triangle',.06,200); unlock('mayo'); }
+          else crush(p);
+        }
+        if(state!=='play') return;
+        break;
+      }
+    }
+    stepParts(dt);
+  }
+
+  /* ---------- Dessin ---------- */
+  function circ(x,y,r){ ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill(); }
+  function rr(x,y,w,h,r){
+    if(w<=0) return; ctx.beginPath();
+    if(ctx.roundRect) ctx.roundRect(x,y,w,h,Math.min(r,w/2,h/2)); else ctx.rect(x,y,w,h);
+    ctx.fill();
+  }
+  function teeth(xa,xb,yb,s){
+    if(xb-xa<2) return; ctx.beginPath();
+    for(var x=xa;x<xb-1;x+=s){ var w=Math.min(s,xb-x); ctx.moveTo(x,yb); ctx.lineTo(x+w/2,yb-s*.9); ctx.lineTo(x+w,yb); }
+    ctx.fill();
+  }
+  function drawDecor(kind,x0,lw,py,col,seed){
+    ctx.fillStyle=col; ctx.strokeStyle=col; ctx.lineWidth=2;
+    if(kind==='checker'||kind==='grid'){
+      var sq=kind==='checker'?44:52, r0=Math.floor((G.D-py)/sq)-1;
+      for(var rw=r0;;rw++){
+        var ry=py+(rw*sq-G.D); if(ry>H+sq) break;
+        if(kind==='checker'){
+          ctx.globalAlpha=.55;
+          for(var c=0;c*sq<lw;c++){ if((rw+c)&1) ctx.fillRect(x0+c*sq,ry,Math.min(sq,lw-c*sq),sq); }
+          ctx.globalAlpha=1;
+        }else ctx.fillRect(x0,ry,lw,2);
+      }
+      if(kind==='grid'){ for(var gx=sq/2;gx<lw;gx+=sq) ctx.fillRect(x0+gx,-40,2,H+80); }
+      return;
+    }
+    var step=96, k0=Math.floor((G.D-py)/step);
+    for(var k=k0;;k++){
+      var yy=py+(k*step-G.D); if(yy>H+40) break; if(yy<-40) continue;
+      var h1=hash(k,seed), h2=hash(k,seed+7), h3=hash(k,seed+13), sx=x0+lw*h1;
+      if(kind==='sprouts'){
+        ctx.globalAlpha=.5; ctx.beginPath(); ctx.ellipse(sx,yy+12,18+h2*10,7,0,0,7); ctx.fill(); ctx.globalAlpha=1;
+        ctx.beginPath(); ctx.moveTo(sx-9,yy+6); ctx.lineTo(sx-3,yy-14-h2*6); ctx.lineTo(sx+1,yy+6);
+        ctx.moveTo(sx-1,yy+6); ctx.lineTo(sx+6,yy-18-h3*6); ctx.lineTo(sx+10,yy+6); ctx.fill();
+      }else if(kind==='ridges'){
+        ctx.fillRect(x0,yy,lw,3); circ(x0+lw*.12,yy+13,2.5); circ(x0+lw*.88,yy+13,2.5);
+      }else if(kind==='creases'){
+        ctx.beginPath(); ctx.moveTo(sx,yy); ctx.lineTo(sx+14+h2*22,yy+16+h3*28); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x0+lw*h2,yy+30); ctx.lineTo(x0+lw*h2-12-h3*16,yy+50); ctx.stroke();
+      }else if(kind==='speckle'){
+        for(var i=0;i<7;i++) ctx.fillRect(x0+lw*hash(k+i*3,seed+1),yy+hash(k,seed+i)*step,2.5,2.5);
+      }else if(kind==='shelves'){
+        if(k%2===0){ ctx.globalAlpha=.8; ctx.fillRect(x0,yy,lw,6); ctx.globalAlpha=.4; ctx.fillRect(x0,yy+6,lw,5); ctx.globalAlpha=1; }
+      }else if(kind==='grain'){
+        ctx.beginPath();
+        for(var gx2=0;gx2<=lw;gx2+=8){ var gy=yy+Math.sin((gx2+h1*60)*.045+k)*5; if(gx2===0) ctx.moveTo(x0,gy); else ctx.lineTo(x0+gx2,gy); }
+        ctx.stroke();
+        if(h2>.7){ ctx.beginPath(); ctx.ellipse(sx,yy+30,9,5,0,0,7); ctx.stroke(); }
+      }else if(kind==='flames'){
+        ctx.beginPath(); ctx.moveTo(sx-7,yy+10); ctx.lineTo(sx,yy-16-h2*14); ctx.lineTo(sx+7,yy+10); ctx.fill();
+      }else if(kind==='splat'){
+        ctx.globalAlpha=.5; ctx.beginPath(); ctx.ellipse(sx,yy+h2*step*.6,6+h3*12,4+h3*6,h2*3,0,7); ctx.fill();
+        circ(x0+lw*h3,yy+h1*step*.8,2+h2*2); ctx.globalAlpha=1;
+      }else if(kind==='snow'){
+        circ(sx,yy+step*h2*.6,2+h2*3); circ(x0+lw*h2,yy+step*h1*.6,1.5+h1*2);
+      }else if(kind==='trash'){
+        ctx.save(); ctx.translate(sx,yy+h2*step*.6); ctx.rotate(h3*6);
+        if(h1>.5) ctx.fillRect(-8,-5,16,10); else circ(0,0,5+h3*4);
+        ctx.restore();
+      }else{
+        circ(sx,yy+h2*step,1+h2*2); circ(x0+lw*h2,yy+h1*step,1+h1*1.5);
+      }
+    }
+  }
+  function drawObs(o,x0,lw,py){
+    var y=py+(o.d-G.D); if(y<-170||y>H+170) return;
+    if(o.kind==='gap'){
+      var g=gapOf(o), gl=x0+(g.c-g.gw/2)*lw, gr=x0+(g.c+g.gw/2)*lw, xe=x0+lw;
+      if(o.type==='pin'){
+        var th=15;
+        ctx.fillStyle='rgba(0,0,0,.35)'; rr(x0-8,y-th-2,gl-x0+10,th*2+4,th); rr(gr-2,y-th-2,xe-gr+10,th*2+4,th);
+        ctx.fillStyle=T.pin; rr(x0-6,y-th,gl-x0+6,th*2,th); rr(gr,y-th,xe-gr+6,th*2,th);
+        ctx.fillStyle='rgba(255,255,255,.2)'; rr(x0,y-th+4,gl-x0-8,4,2); rr(gr+8,y-th+4,xe-gr-8,4,2);
+      }else{
+        drawKnife(x0-4,gl,y); drawKnife(xe+4,gr,y);
+      }
+      return;
+    }
+    var b=blockOf(o), cx=x0+b.c*lw;
+    if(o.type==='pin'){
+      var hw=b.w*lw/2;
+      ctx.fillStyle='rgba(0,0,0,.35)'; rr(cx-hw-2,y-17,hw*2+4,34,17);
+      ctx.fillStyle=T.pin; rr(cx-hw,y-15,hw*2,30,15);
+      ctx.fillStyle='rgba(255,255,255,.2)'; rr(cx-hw+8,y-10,hw*2-16,4,2);
+    }else{
+      var R=b.w*lw/2;
+      drawPizzaCutter(cx,y,R);
+    }
+  }
+  /* Mode dev : zones où le CENTRE de la patate ne doit pas se trouver (rouge) */
+  function drawHitboxes(p,x0,lw,py,r){
+    var rf=r/lw;
+    ctx.save(); ctx.fillStyle='rgba(255,0,0,.25)'; ctx.strokeStyle='rgba(255,0,0,.9)'; ctx.lineWidth=1.5;
+    p.obs.forEach(function(o){
+      if(o.hit) return;
+      var y=py+(o.d-G.D);
+      if(o.kind==='gap'){
+        var g=gapOf(o), th=(o.type==='blade'?13:15)+r*.8, xr=rf*.85;
+        var a=x0+(g.c-g.gw/2+xr)*lw, b=x0+(g.c+g.gw/2-xr)*lw;
+        ctx.fillRect(x0,y-th,a-x0,th*2); ctx.strokeRect(x0,y-th,a-x0,th*2);
+        ctx.fillRect(b,y-th,x0+lw-b,th*2); ctx.strokeRect(b,y-th,x0+lw-b,th*2);
+      }else{
+        var bl=blockOf(o), cx=x0+bl.c*lw;
+        if(o.type==='blade'){ var R=bl.w*lw/2+r*.75; ctx.beginPath(); ctx.arc(cx,y,R,0,7); ctx.fill(); ctx.stroke(); }
+        else{ var hw=bl.w*lw/2+r*.8, th2=15+r*.8; ctx.fillRect(cx-hw,y-th2,hw*2,th2*2); ctx.strokeRect(cx-hw,y-th2,hw*2,th2*2); }
+      }
+    });
+    ctx.fillStyle='#00e060'; circ(x0+p.x*lw,py,3);
+    ctx.restore();
+  }
+  /* Couteau de cuisine (horizontal, pointe vers la brèche, tranchant vers le haut) */
+  function drawKnife(xh,xt,y){
+    var L=Math.abs(xt-xh); if(L<14) return;
+    var dir=xt>=xh?1:-1, hl=Math.min(40,L*.42), hh=11;
+    ctx.save(); ctx.translate(xh,y); ctx.scale(dir,1); ctx.lineJoin='round';
+    ctx.fillStyle='rgba(0,0,0,.45)'; rr(-10,-hh*.85-2,hl+14,hh*1.7+4,6);
+    ctx.fillStyle='#5a3a22'; rr(-8,-hh*.85,hl+10,hh*1.7,5);
+    ctx.fillStyle='rgba(255,255,255,.18)'; rr(-6,-hh*.6,Math.max(2,hl-2),3,1.5);
+    ctx.fillStyle='#e6d3a8'; circ(hl*.28,0,2.2); circ(hl*.68,0,2.2);
+    ctx.beginPath(); ctx.moveTo(hl,hh); ctx.lineTo(L-14,hh); ctx.quadraticCurveTo(L-2,hh,L,-hh*.15);
+    ctx.quadraticCurveTo(hl+(L-hl)*.55,-hh*1.2,hl,-hh*.9); ctx.closePath();
+    ctx.lineWidth=4; ctx.strokeStyle='rgba(0,0,0,.55)'; ctx.stroke();
+    ctx.fillStyle=T.metal; ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.lineWidth=1.6; ctx.beginPath();
+    ctx.moveTo(hl+8,-hh*.35); ctx.quadraticCurveTo(hl+(L-hl)*.55,-hh*.65,L-18,-hh*.2); ctx.stroke();
+    ctx.fillStyle=T.metalDark; ctx.fillRect(hl,hh-3,Math.max(0,L-14-hl),3); ctx.fillRect(hl-3,-hh*.95,4,hh*1.95);
+    ctx.restore();
+  }
+  /* Roulette à pizza : roue qui tourne + manche rouge fixe (côté opposé au joueur) */
+  function drawPizzaCutter(cx,y,R){
+    ctx.save(); ctx.translate(cx,y);
+    var hl=R*1.55+8;
+    ctx.save(); ctx.rotate(.9);
+    ctx.fillStyle='rgba(0,0,0,.4)'; rr(0,-R*.2-2,hl+4,R*.4+4,6);
+    ctx.fillStyle='#c0392b'; rr(R*.45,-R*.17,hl-R*.45,R*.34,6);
+    ctx.fillStyle='#8f2a1c'; rr(R*.45,-R*.17,5,R*.34,2);
+    ctx.fillStyle='rgba(255,255,255,.25)'; rr(R*.45+8,-R*.1,Math.max(2,hl-R*.45-16),3,1.5);
+    ctx.restore();
+    ctx.rotate(G.t*5);
+    ctx.fillStyle='rgba(0,0,0,.4)'; circ(0,0,R+3);
+    ctx.fillStyle=T.metal; circ(0,0,R);
+    ctx.strokeStyle=T.metalDark; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,R-1,0,7); ctx.stroke();
+    ctx.fillStyle='rgba(60,70,80,.75)';
+    for(var i=0;i<6;i++){ var a=i/6*6.2832; circ(Math.cos(a)*R*.6,Math.sin(a)*R*.6,Math.max(2,R*.12)); }
+    ctx.fillStyle=T.metalDark; circ(0,0,R*.22); ctx.fillStyle='#e8eef2'; circ(0,0,R*.1);
+    ctx.restore();
+  }
+  /* Bonus : halo coloré selon la rareté (vert, bleu, violet, arc-en-ciel) */
+  function tierColor(t){ return t===3?'hsl('+Math.floor((G.t*220)%360)+',100%,60%)':TIERS[t].color; }
+  function drawBonus(x,y,pk){
+    var col=tierColor(pk.tier), pulse=1+Math.sin(G.t*6+pk.d)*.1, R=(pk.tier===3?27:23)*pulse;
+    ctx.save(); ctx.shadowColor=col; ctx.shadowBlur=18;
+    ctx.fillStyle='rgba(255,255,255,.6)'; ctx.beginPath(); ctx.arc(x,y,R,0,7); ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.lineWidth=7; ctx.beginPath(); ctx.arc(x,y,R,0,7); ctx.stroke();
+    ctx.strokeStyle=col; ctx.lineWidth=4; ctx.beginPath(); ctx.arc(x,y,R,0,7); ctx.stroke();
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='26px '+EMOJI_FONT; ctx.fillStyle='#000';
+    ctx.fillText(BONUS_BY[pk.b].icon,x,y+1);
+    if(pk.tier===3){
+      ctx.fillStyle='#fff';
+      for(var i=0;i<4;i++){ var a=G.t*2.5+i*1.5708; circ(x+Math.cos(a)*R*1.25,y+Math.sin(a)*R*1.25,2.5); }
+    }
+  }
+  /* Golds : pièce qui tourne, contour sombre + halo doré, visible sur tous les décors */
+  function drawGold(x,y,seed){
+    var R=12, w=.55+.45*Math.abs(Math.cos(G.t*4+seed));
+    ctx.fillStyle='rgba(0,0,0,.45)'; ctx.beginPath(); ctx.ellipse(x,y,(R+3.5)*w+1.5,R+3.5,0,0,7); ctx.fill();
+    ctx.save(); ctx.shadowColor='#ffd23f'; ctx.shadowBlur=12;
+    ctx.fillStyle='#ffc928'; ctx.strokeStyle='#8a4f00'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.ellipse(x,y,R*w,R,0,0,7); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle='#fff0a8'; ctx.lineWidth=1.8; ctx.beginPath(); ctx.ellipse(x,y,R*w*.62,R*.62,0,0,7); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.9)'; ctx.beginPath(); ctx.ellipse(x-R*w*.32,y-R*.38,R*w*.17+.5,R*.2,0,0,7); ctx.fill();
+  }
+  function stoneShape(c,rx,ry){
+    var M=[1.05,.9,1.1,.94,1.12,.9,1.08,.93,1.03,.97];
+    c.beginPath();
+    for(var i=0;i<M.length;i++){
+      var a=i/M.length*6.2832-1.5708, px=Math.cos(a)*rx*M[i], py=Math.sin(a)*ry*M[i];
+      if(i===0) c.moveTo(px,py); else c.lineTo(px,py);
+    }
+    c.closePath();
+  }
+  function paintMagnet(c,r){
+    c.save(); c.lineCap='butt'; c.lineWidth=r*.34;
+    c.strokeStyle='#d1432f'; c.beginPath(); c.moveTo(-r*.5,-r*1.15); c.lineTo(-r*.5,-r*1.55); c.arc(0,-r*1.55,r*.5,Math.PI,0); c.lineTo(r*.5,-r*1.15); c.stroke();
+    c.strokeStyle='#e6ebef'; c.beginPath(); c.moveTo(-r*.5,-r*1.15); c.lineTo(-r*.5,-r*.92); c.moveTo(r*.5,-r*1.15); c.lineTo(r*.5,-r*.92); c.stroke();
+    c.restore();
+  }
+  function bodyPath(form,r){
+    ctx.beginPath();
+    if(form==='fry'){
+      if(ctx.roundRect) ctx.roundRect(-r*.62,-r*1.25,r*1.24,r*2.5,r*.35); else ctx.rect(-r*.62,-r*1.25,r*1.24,r*2.5);
+    }else if(curSkin().stone) stoneShape(ctx,r*1.03,r*1.2);
+    else ctx.ellipse(0,0,r*1.03,r*1.2,0,0,7);
+  }
+  function drawPotato(x,y,r,form,p){
+    var SK=curSkin();
+    ctx.save(); ctx.translate(x,y);
+    ctx.rotate(Math.sin(G.t*6+p.wob)*.1+G.vx*.12);
+    if(p.inv>0&&Math.floor(G.t*16)%2===0) ctx.globalAlpha=.4;
+    if(SK.cape||G.glide>0){
+      ctx.fillStyle=SK.cape?'#d1432f':'#f4f4f4'; ctx.strokeStyle=SK.cape?'#8f2a1c':'#8a8a8a'; ctx.lineWidth=Math.max(1.5,r*.08);
+      if(G.glide>0){
+        ctx.beginPath(); ctx.ellipse(0,-r*2.1,r*2.1,r*1.15,0,Math.PI,0); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-r*2.0,-r*2.1); ctx.lineTo(-r*.5,-r*.7); ctx.moveTo(r*2.0,-r*2.1); ctx.lineTo(r*.5,-r*.7); ctx.moveTo(0,-r*3.2); ctx.lineTo(0,-r*.9); ctx.stroke();
+      }else{
+        var fl=Math.sin(G.t*9+p.wob)*r*.25;
+        ctx.beginPath(); ctx.moveTo(-r*.7,-r*.5); ctx.quadraticCurveTo(-r*1.3+fl,-r*1.3,-r*1.2+fl,-r*2.0);
+        ctx.lineTo(r*1.2-fl,-r*2.0-fl*.5); ctx.quadraticCurveTo(r*1.3-fl,-r*1.3,r*.7,-r*.5); ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+    }
+    if(SK.magnet) paintMagnet(ctx,r);
+    ctx.lineWidth=Math.max(2,r*.12); ctx.strokeStyle=T.potatoEdge;
+    ctx.fillStyle=form==='fry'?T.fry:T.potato; bodyPath(form,r); ctx.fill(); ctx.stroke();
+    if(form==='half'){ ctx.fillStyle=T.flesh; ctx.beginPath(); ctx.ellipse(0,0,r*.72,r*.92,0,0,7); ctx.fill(); }
+    else if(form==='whole'){
+      var a=ctx.globalAlpha;
+      if(SK.stone){
+        ctx.globalAlpha=a*.7; ctx.strokeStyle=T.potatoEdge; ctx.lineWidth=Math.max(1.5,r*.07);
+        ctx.beginPath(); ctx.moveTo(-r*.7,r*.2); ctx.lineTo(-r*.3,r*.5); ctx.lineTo(-r*.35,r*.85); ctx.moveTo(r*.45,-r*.75); ctx.lineTo(r*.2,-r*.45); ctx.lineTo(r*.5,-r*.2); ctx.stroke();
+      }else{
+        ctx.globalAlpha=a*.35; ctx.fillStyle=T.potatoEdge;
+        circ(-r*.55,r*.45,r*.1); circ(r*.5,r*.7,r*.08); circ(r*.1,-r*.85,r*.08);
+      }
+      ctx.globalAlpha=a;
+    }
+    if(p.oven>0){ ctx.fillStyle='rgba(232,100,20,.5)'; bodyPath(form,r); ctx.fill(); }
+    var ex=r*.3, ey=-r*.18, er=r*.24, off=clamp(G.vx,-1,1)*er*.4;
+    ctx.fillStyle='#fff'; circ(-ex,ey,er); circ(ex,ey,er);
+    ctx.fillStyle='#222'; circ(-ex+off,ey,er*.5); circ(ex+off,ey,er*.5);
+    ctx.fillStyle='#5a2a1a'; ctx.beginPath();
+    if(p.scared) ctx.ellipse(0,r*.5,r*.16,r*.22,0,0,7); else ctx.ellipse(0,r*.45,r*.22,r*.1,0,0,7);
+    ctx.fill();
+    ctx.restore();
+  }
+  function draw(){
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    ctx.clearRect(0,0,W,H);
+    if(!G) return;
+    var C=palette(G.D);
+    var sx=0, sy=0;
+    if(G.shake>0){ sx=(Math.random()-.5)*G.shake*30; sy=(Math.random()-.5)*G.shake*30; }
+    ctx.save(); ctx.translate(sx,sy);
+    var n=G.pieces.length||1, py=H*.3, lw=W/n, r=Math.min(26,lw*.12);
+    var form=n===1?'whole':(n===2?'half':'fry');
+    for(var i=0;i<G.pieces.length;i++){
+      var p=G.pieces[i], x0=i*lw;
+      ctx.save(); ctx.beginPath(); ctx.rect(x0,-40,lw,H+80); ctx.clip();
+      ctx.fillStyle=i%2?C.b:C.a; ctx.fillRect(x0,-40,lw,H+80);
+      drawDecor(C.deco,x0,lw,py,C.line,p.seed);
+      for(var j=0;j<p.obs.length;j++) drawObs(p.obs[j],x0,lw,py);
+      if(devOn()&&settings.hitbox==='on') drawHitboxes(p,x0,lw,py,r);
+      for(var m=0;m<p.pick.length;m++){
+        var pk=p.pick[m]; if(pk.taken) continue;
+        var yy=py+(pk.d-G.D); if(yy<-30||yy>H+30) continue;
+        var px=x0+pk.x*lw;
+        if(pk.k==='fuse'){
+          var pulse=1+Math.sin(G.t*6)*.12;
+          ctx.fillStyle='rgba(255,226,122,.6)'; circ(px,yy,22*pulse);
+          ctx.strokeStyle='rgba(0,0,0,.4)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(px,yy,22*pulse,0,7); ctx.stroke();
+          ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='26px '+EMOJI_FONT; ctx.fillStyle='#000';
+          ctx.fillText('🧈',px,yy+1);
+        }else if(pk.k==='bonus') drawBonus(px,yy,pk);
+        else drawGold(px,yy,pk.d*.013);
+      }
+      drawPotato(x0+p.x*lw,py,r,form,p);
+      ctx.restore();
+      if(i>0){ ctx.fillStyle=C.ink; ctx.globalAlpha=.25; ctx.fillRect(x0-1,0,2,H); ctx.globalAlpha=1; }
+    }
+    for(var q=0;q<G.parts.length;q++){
+      var pt=G.parts[q]; ctx.globalAlpha=clamp(pt.life/pt.max*2,0,1); ctx.fillStyle=pt.c; circ(pt.x,pt.y,pt.s);
+    }
+    ctx.globalAlpha=1;
+    ctx.restore();
+
+    if(G.slowT>0){ var sr=Math.max(0,G.slowT)/G.slowDur; ctx.fillStyle='rgba(110,160,255,'+(.16*sr*sr).toFixed(3)+')'; ctx.fillRect(0,0,W,H); }
+    if(G.flash>0){ ctx.fillStyle='rgba(255,255,255,'+(.4*G.flash).toFixed(3)+')'; ctx.fillRect(0,0,W,H); }
+    var inGame=(state==='play'||state==='paused'||state==='countdown');
+    if(inGame){
+      var SK=curSkin();
+      ctx.fillStyle=C.ink; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.font='800 26px '+SANS;
+      ctx.fillText(G.score+' m',W/2,30);
+      ctx.font='600 14px '+SANS+','+EMOJI_FONT; ctx.globalAlpha=.85;
+      var extra='🥔 ×'+G.pieces.length+'   🪙 '+G.gold;
+      if(G.ketchup>0) extra+='   🍅×'+G.ketchup;
+      if(G.mayo>0) extra+='   🥚×'+G.mayo;
+      if(goldMul()>1) extra+='   🪙×'+goldMul();
+      if(G.mustard) extra+='   🌭';
+      if(G.hot) extra+='   🌶️';
+      if(SK.cape) extra+=G.glide>0?'   🪂 !':(G.glideCd>0?'   🪂 '+Math.ceil(G.glideCd)+'s':'   🪂 ✓');
+      if(settings.mode==='survive'&&G.lost>0) extra+='   ⚡ +'+Math.round(G.lost*22)+'%';
+      if(G.magnetT>0) extra+='   🧲 '+Math.ceil(G.magnetT)+'s';
+      if(G.skinOverride) extra+='   🌈';
+      if(devOn()) extra+='   🛠';
+      ctx.fillText(extra,W/2,56);
+      ctx.globalAlpha=1;
+      if(state==='countdown'){
+        ctx.globalAlpha=.9; ctx.font='800 96px '+SANS; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(Math.max(1,Math.ceil(G.cd/.7)),W/2,H*.5); ctx.globalAlpha=1;
+      }
+      if(G.banner){
+        var bt=G.banner.t, ba=bt<.4?bt/.4:(bt>2?clamp((2.6-bt)/.6,0,1):1);
+        ctx.globalAlpha=ba; ctx.font='800 30px '+SANS+','+EMOJI_FONT; ctx.fillText(G.banner.text,W/2,H*.45);
+        ctx.globalAlpha=1;
+      }
+      if(G.t<3.4){
+        ctx.globalAlpha=clamp(1-(G.t-2.4),0,1)*.9;
+        ctx.font='700 17px '+SANS+','+EMOJI_FONT;
+        ctx.fillText(tr(activeControl==='tilt'?'tut_tilt':'tut_tap'),W/2,H*.62);
+        if(SK.cape) ctx.fillText(tr(activeControl==='tilt'?'tut_cape_tilt':'tut_cape_tap'),W/2,H*.62+26);
+        if(SK.stone) ctx.fillText(tr('tut_stone'),W/2,H*.62+26);
+        ctx.globalAlpha=1;
+      }
+    }
+  }
+
+  /* ---------- Boucle ---------- */
+  var last=0;
+  function frame(ts){
+    var dt=Math.min(.033,((ts-last)/1000)||0); last=ts;
+    if(G){
+      if(state==='play') update(dt);
+      else if(state==='menu'){ G.D+=70*dt; G.t+=dt; stepParts(dt); }
+      else if(state==='countdown'){ G.cd-=dt; if(G.cd<=0) setState('play'); }
+      else if(state==='over') stepParts(dt);
+    }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- Menus & boutique ---------- */
+  function syncUI(){
+    document.querySelectorAll('.seg').forEach(function(seg){
+      var key=seg.getAttribute('data-key');
+      seg.querySelectorAll('button').forEach(function(b){
+        b.classList.toggle('on',b.getAttribute('data-v')===settings[key]);
+      });
+    });
+    $('hint').textContent=tr(settings.control==='tilt'?'hint_tilt':'hint_tap')+' '+tr(settings.mode==='classic'?'hint_classic':'hint_survive');
+    var parts=[];
+    if(best>0) parts.push(tr('record',best));
+    parts.push(wallet+' 🪙');
+    ITEMS.forEach(function(it){ if(it.kind==='cons'&&inv[it.id]>0) parts.push(it.icon+' ×'+inv[it.id]); });
+    $('bestLine').textContent=parts.join(' · ');
+    $('devBtn').textContent=tr('dev_btn',devOn()?'ON':'off');
+    $('devBtn').classList.toggle('on',devOn());
+  }
+
+  var shopFrom='menu', shopTab='items';
+  function drawSkinPreview(c,sk){
+    var x=c.getContext('2d'), s=c.width, r=s*.26;
+    x.clearRect(0,0,s,s); x.save(); x.translate(s/2,s/2+s*.1);
+    if(sk.cape){ x.fillStyle='#d1432f'; x.beginPath(); x.moveTo(-r*.7,-r*.5); x.lineTo(-r*1.3,-r*1.8); x.lineTo(r*1.3,-r*1.8); x.lineTo(r*.7,-r*.5); x.closePath(); x.fill(); }
+    if(sk.magnet) paintMagnet(x,r);
+    x.fillStyle=sk.body; x.strokeStyle=sk.edge; x.lineWidth=Math.max(2,r*.12);
+    if(sk.stone) stoneShape(x,r*1.03,r*1.2); else { x.beginPath(); x.ellipse(0,0,r*1.03,r*1.2,0,0,7); }
+    x.fill(); x.stroke();
+    x.fillStyle='#fff'; x.beginPath(); x.arc(-r*.3,-r*.18,r*.24,0,7); x.fill(); x.beginPath(); x.arc(r*.3,-r*.18,r*.24,0,7); x.fill();
+    x.fillStyle='#222'; x.beginPath(); x.arc(-r*.3,-r*.18,r*.12,0,7); x.fill(); x.beginPath(); x.arc(r*.3,-r*.18,r*.12,0,7); x.fill();
+    x.restore();
+  }
+  function renderSkins(list){
+    var premiumLabel=false;
+    SKINS.forEach(function(sk){
+      if(sk.premium&&!premiumLabel){
+        premiumLabel=true;
+        var lab=document.createElement('p'); lab.className='best'; lab.style.margin='6px 0 0';
+        lab.textContent=tr('premium_label'); list.appendChild(lab);
+      }
+      var owned=isOwned(sk), equipped=skinId===sk.id;
+      var row=document.createElement('div'); row.className='item';
+      var pv=document.createElement('canvas'); pv.width=88; pv.height=88; pv.style.cssText='width:44px;height:44px;flex:none';
+      drawSkinPreview(pv,sk); row.appendChild(pv);
+      var t=document.createElement('div'); t.className='t';
+      var b=document.createElement('b'); b.textContent=X(sk.name)+(sk.premium?' ⭐':'');
+      var s2=document.createElement('small'); s2.textContent=sk.premium?X(sk.desc):tr('skin_cosmetic');
+      t.appendChild(b); t.appendChild(s2); row.appendChild(t);
+      var btn=document.createElement('button'); btn.className='ghost';
+      if(equipped){ btn.textContent=tr('equipped'); btn.disabled=true; }
+      else if(owned){
+        btn.textContent=tr('equip');
+        btn.addEventListener('click',function(){ skinId=sk.id; applySkin(); save(); renderShop(); });
+      }else if(sk.premium){
+        btn.textContent=tr('try_price',sk.priceEur);
+        btn.addEventListener('click',function(){ skinId=sk.id; applySkin(); renderShop(); toast(tr('toast_demo')); });
+      }else{
+        var pr=priceOf(sk.price); btn.textContent=pr+' 🪙'; btn.disabled=wallet<pr;
+        btn.addEventListener('click',function(){
+          if(wallet<pr) return;
+          wallet-=pr; ownedSkins[sk.id]=true; skinId=sk.id; applySkin(); save(); renderShop(); if(Object.keys(ownedSkins).length>=3) unlock('garderobe'); beep(700,.1,'triangle',.06,300);
+        });
+      }
+      row.appendChild(btn); list.appendChild(row);
+    });
+  }
+  function renderShop(){
+    $('walletLine').textContent=tr('wallet',wallet)+(devOn()?tr('dev_suffix'):'');
+    $('devGold').classList.toggle('hidden',!devOn());
+    document.querySelectorAll('#shopTabs button').forEach(function(b){ b.classList.toggle('on',b.getAttribute('data-t')===shopTab); });
+    var list=$('shopList'); list.innerHTML='';
+    if(shopTab==='skins'){ renderSkins(list); return; }
+    ITEMS.forEach(function(it){
+      var owned=inv[it.id]||0, row=document.createElement('div'); row.className='item';
+      var t=document.createElement('div'); t.className='t';
+      var b=document.createElement('b'); b.textContent=it.icon+' '+X(it.name)+(it.kind==='cons'&&owned?'  ×'+owned:'');
+      var s2=document.createElement('small'); s2.textContent=tr(it.kind==='cons'?'kind_cons':'kind_pass')+X(it.desc);
+      t.appendChild(b); t.appendChild(s2); row.appendChild(t);
+      var btn=document.createElement('button'); btn.className='ghost';
+      if(it.kind==='pass'&&owned){ btn.textContent=tr('owned'); btn.disabled=true; }
+      else if(devOn()){
+        btn.textContent=tr(it.kind==='cons'?'plus5':'get_dev');
+        btn.addEventListener('click',function(){ inv[it.id]=it.kind==='cons'?(inv[it.id]||0)+5:1; save(); renderShop(); beep(700,.1,'triangle',.06,300); });
+      }else{
+        var pr=priceOf(it.price); btn.textContent=pr+' 🪙'; btn.disabled=wallet<pr;
+        btn.addEventListener('click',function(){
+          if(wallet<pr) return;
+          wallet-=pr; inv[it.id]=(inv[it.id]||0)+1; save(); renderShop(); beep(700,.1,'triangle',.06,300);
+        });
+      }
+      row.appendChild(btn); list.appendChild(row);
+    });
+  }
+  function showShop(from){
+    shopFrom=from; $('menu').classList.add('hidden'); $('over').classList.add('hidden');
+    renderShop(); $('shop').classList.remove('hidden');
+  }
+  document.querySelectorAll('#shopTabs button').forEach(function(b){
+    b.addEventListener('click',function(){ shopTab=b.getAttribute('data-t'); renderShop(); });
+  });
+  document.querySelectorAll('.seg button').forEach(function(b){
+    b.addEventListener('click',function(){
+      var key=b.parentNode.getAttribute('data-key');
+      settings[key]=b.getAttribute('data-v'); save();
+      if(key==='lang') applyI18n(); else syncUI();
+    });
+  });
+  $('devBtn').addEventListener('click',function(){
+    settings.dev=devOn()?'off':'on';
+    if(!devOn()&&!isOwned(skinById(skinId))){ skinId='classic'; applySkin(); }
+    save(); syncUI();
+    toast(tr(devOn()?'toast_dev_on':'toast_dev_off'));
+  });
+  $('devGold').addEventListener('click',function(){ wallet+=1000; save(); renderShop(); beep(880,.1,'triangle',.06,300); });
+
+  function renderAch(){
+    var list=$('achList'); list.innerHTML='';
+    var done=ACHS.filter(function(a){return ach[a.id]}).length;
+    $('achCount').textContent=tr('ach_count',done,ACHS.length);
+    $('achReset').classList.toggle('hidden',!devOn());
+    ACHS.forEach(function(a){
+      var ok=!!ach[a.id], show=ok||!a.secret, row=document.createElement('div');
+      row.className='item '+(ok?'done':'locked');
+      var ic=document.createElement('div'); ic.style.cssText='font-size:1.6rem;flex:none;width:34px;text-align:center'; ic.textContent=show?a.icon:'❓';
+      var t=document.createElement('div'); t.className='t';
+      var b=document.createElement('b'); b.textContent=show?X(a.name):'???';
+      var s2=document.createElement('small'); s2.textContent=show?X(a.desc):tr('ach_secret');
+      t.appendChild(b); t.appendChild(s2);
+      var rw=document.createElement('div'); rw.className='rw'; rw.textContent=(ok?'✓ ':'')+'+'+a.reward+' 🪙';
+      row.appendChild(ic); row.appendChild(t); row.appendChild(rw); list.appendChild(row);
+    });
+  }
+  $('openAch').addEventListener('click',function(){ $('menu').classList.add('hidden'); renderAch(); $('ach').classList.remove('hidden'); });
+  $('achBack').addEventListener('click',function(){ $('ach').classList.add('hidden'); $('menu').classList.remove('hidden'); syncUI(); });
+  $('achReset').addEventListener('click',function(){ ach={}; stats.runs=0; save(); renderAch(); toast(tr('toast_ach_reset')); });
+
+  /* ---------- Pause / reprise ---------- */
+  var ICON_PAUSE='<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></svg>';
+  var ICON_PLAY='<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>';
+  function setState(st){
+    state=st;
+    var inG=(st==='play'||st==='paused'||st==='countdown');
+    $('pauseBtn').classList.toggle('hidden',!inG);
+    $('pauseBtn').innerHTML=(st==='paused')?ICON_PLAY:ICON_PAUSE;
+  }
+  function renderPause(){
+    $('hitboxBtn').classList.toggle('hidden',!devOn());
+    $('hitboxBtn').textContent=tr('hitbox_btn',settings.hitbox==='on'?'ON':'off');
+    syncUI();
+  }
+  function pause(){
+    if(state!=='play'&&state!=='countdown') return;
+    touches.clear(); starts.clear(); tapDir=0; keyDir=0;
+    setState('paused'); renderPause(); $('pause').classList.remove('hidden');
+  }
+  function resume(){
+    if(state!=='paused') return;
+    $('pause').classList.add('hidden'); G.cd=2.1; setState('countdown');
+  }
+  function endRunEarly(){
+    if(!G) return;
+    wallet+=G.gold; if(G.score>best) best=G.score; stats.runs++; save();
+    if(stats.runs>=10) unlock('accro');
+  }
+  $('pauseBtn').addEventListener('click',function(){
+    if(state==='paused') resume(); else pause();
+    if($('pauseBtn').blur) $('pauseBtn').blur();
+  });
+  $('resumeBtn').addEventListener('click',resume);
+  $('restartBtn').addEventListener('click',function(){ endRunEarly(); $('pause').classList.add('hidden'); startGame(); });
+  $('quitBtn').addEventListener('click',function(){
+    endRunEarly(); $('pause').classList.add('hidden'); setState('menu');
+    $('menu').classList.remove('hidden'); newGame(); syncUI();
+  });
+  $('hitboxBtn').addEventListener('click',function(){ settings.hitbox=settings.hitbox==='on'?'off':'on'; renderPause(); });
+  if(document.addEventListener) document.addEventListener('visibilitychange',function(){ if(document.hidden) pause(); });
+
+  function startGame(){
+    newGame(); setState('play');
+    if(inv.ketchup>0){ inv.ketchup--; G.ketchup=1; }
+    if(inv.mayo>0){ inv.mayo--; G.mayo=1; }
+    if(inv.pepper>0){ inv.pepper--; G.pepper=true; }
+    if(inv.mustard>0){ inv.mustard--; G.mustard=true; }
+    if(inv.hot>0){ inv.hot--; G.hot=true; }
+    save();
+    $('menu').classList.add('hidden'); $('over').classList.add('hidden'); $('shop').classList.add('hidden'); $('ach').classList.add('hidden'); $('pause').classList.add('hidden');
+    if(activeControl==='tilt'){
+      setTimeout(function(){
+        if(state==='play'&&activeControl==='tilt'&&!tiltSeen){
+          activeControl='tap'; toast(tr('toast_sensor'));
+        }
+      },1600);
+    }
+  }
+  $('play').addEventListener('click',function(){
+    try{ if(!ac) ac=new (window.AudioContext||window.webkitAudioContext)(); if(ac.resume) ac.resume(); }catch(e){}
+    if(settings.control==='tilt'){
+      enableTilt().then(function(ok){
+        activeControl=ok?'tilt':'tap';
+        if(!ok) toast(tr('toast_tilt_denied'));
+        startGame();
+      });
+    }else{ activeControl='tap'; startGame(); }
+  });
+  $('again').addEventListener('click',startGame);
+  $('openShop').addEventListener('click',function(){ showShop('menu'); });
+  $('overShop').addEventListener('click',function(){ showShop('over'); });
+  $('shopBack').addEventListener('click',function(){
+    $('shop').classList.add('hidden');
+    $(shopFrom==='over'?'over':'menu').classList.remove('hidden'); syncUI();
+  });
+  $('toMenu').addEventListener('click',function(){
+    setState('menu'); $('over').classList.add('hidden'); $('menu').classList.remove('hidden'); newGame(); syncUI();
+  });
+
+  resize(); newGame(); applyI18n();
+  requestAnimationFrame(function(){ resize(); requestAnimationFrame(frame); });
+})();
+</script>
+</body>
+</html>
