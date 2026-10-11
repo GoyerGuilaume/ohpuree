@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Oh purée !</string>
+    <string name="title_activity_main">Oh purée !</string>
+    <string name="package_name">com.ohpuree.test</string>
+    <string name="custom_url_scheme">com.ohpuree.test</string>
+</resources>
